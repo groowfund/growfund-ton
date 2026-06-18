@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0E1A">
+<title>GrowFund TON</title>
+
+<!-- ═══════════════════════════════════════════════
+     TELEGRAM WEB APP SDK — OBLIGATORIO PRIMERO
+═══════════════════════════════════════════════ -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<!-- TON CONNECT UI (conexión de billeteras TON) -->
+<script src="https://unpkg.com/@tonconnect/ui@2.0.6/dist/tonconnect-ui.min.js"></script>
+
+<style>
+/* ═══════════════════════════════
+   VARIABLES DE DISEÑO
+═══════════════════════════════ */
+:root {
+  --navy:         #0A0E1A;
+  --navy-mid:     #111827;
+  --navy-light:   #1C2537;
+  --ton-blue:     #0088CC;
+  --ton-light:    #00AAFF;
+  --diamond:      #00D4FF;
+  --diamond-pale: rgba(0,212,255,0.12);
+  --green:        #00E676;
+  --gold:         #FFD700;
+  --gold-dark:    #B8860B;
+  --red:          #FF6B6B;
+  --purple:       #C77DFF;
+  --text:         #E8EDF5;
+  --muted:        #7A8BA0;
+  --glass:        rgba(255,255,255,0.04);
+  --glass-b:      rgba(255,255,255,0.08);
+  --r:            16px;
+  --r-sm:         10px;
+}
+
+/* ═══════════════════════════════
+   RESET & BASE
+═══════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--navy);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* ═══════════════════════════════
+   CANVAS PARTÍCULAS (fondo)
+═══════════════════════════════ */
+#canvas {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0; opacity: 0.3;
+}
+
+/* ═══════════════════════════════
+   APP WRAPPER
+═══════════════════════════════ */
+#app {
+  position: relative; z-index: 1;
+  max-width: 430px; margin: 0 auto;
+  min-height: 100vh; display: flex; flex-direction: column;
+}
+
+/* ═══════════════════════════════
+   LOADER
+═══════════════════════════════ */
+#loader {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--navy); display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+}
+#loader .logo-big { font-size: 56px; animation: pulse 1.4s ease infinite; }
+#loader .loader-text { font-size: 14px; color: var(--muted); letter-spacing: 1px; }
+@keyframes pulse { 0%,100%{transform:scale(1);filter:drop-shadow(0 0 12px rgba(0,212,255,0.4))} 50%{transform:scale(1.1);filter:drop-shadow(0 0 24px rgba(0,212,255,0.7))} }
+#loader .loader-bar { width: 140px; height: 3px; background: var(--glass-b,rgba(255,255,255,0.08)); border-radius: 10px; overflow: hidden; }
+#loader .lb-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--ton-blue), var(--diamond)); border-radius: 10px; animation: loadbar 1.8s ease forwards; }
+@keyframes loadbar { to { width: 100%; } }
+
+/* ═══════════════════════════════
+   OVERLAY BIENVENIDA
+═══════════════════════════════ */
+.overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(10,14,26,0.96);
+  backdrop-filter: blur(24px);
+  display: flex; align-items: flex-end; padding: 0;
+  transition: opacity 0.3s;
+}
+.overlay.hidden { display: none; }
+.overlay-sheet {
+  background: linear-gradient(180deg, var(--navy-light) 0%, var(--navy-mid) 100%);
+  border-top: 1px solid rgba(0,212,255,0.15);
+  border-radius: 24px 24px 0 0;
+  width: 100%; padding: 32px 24px 40px;
+  animation: slideUp 0.4s cubic-bezier(.16,1,.3,1);
+}
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.ov-gem { font-size: 60px; text-align: center; margin-bottom: 16px; filter: drop-shadow(0 0 24px rgba(0,212,255,0.5)); }
+.ov-title { font-size: 24px; font-weight: 800; text-align: center; margin-bottom: 8px; letter-spacing: -0.5px; }
+.ov-sub { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.7; margin-bottom: 28px; }
+.ov-features { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+.ov-feat { display: flex; align-items: center; gap: 12px; background: var(--glass); border: 1px solid var(--glass-b); border-radius: 12px; padding: 12px 14px; }
+.ov-feat-icon { font-size: 22px; flex-shrink: 0; }
+.ov-feat-text { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.ov-feat-text strong { color: var(--text); display: block; font-size: 13px; margin-bottom: 1px; }
+.ov-security { font-size: 11px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.6; }
+.ov-security strong { color: var(--green); }
+
+/* ═══════════════════════════════
+   HEADER
+═══════════════════════════════ */
+.header {
+  padding: 14px 18px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--glass-b);
+  background: rgba(10,14,26,0.88);
+  backdrop-filter: blur(20px);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo-icon {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--ton-blue), var(--diamond));
+  border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  font-size: 17px; box-shadow: 0 0 16px rgba(0,212,255,0.3);
+  flex-shrink: 0;
+}
+.logo-name { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; background: linear-gradient(90deg,#fff 50%, var(--diamond)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.logo-tag { font-size: 9px; color: var(--muted); letter-spacing: 0.5px; margin-top: -2px; }
+
+/* TON Connect button — sobreescribir estilos del SDK */
+#ton-connect-root tc-root { --tc-font-family: -apple-system, sans-serif; }
+#ton-connect-root button {
+  background: var(--glass) !important;
+  border: 1px solid var(--glass-b) !important;
+  border-radius: 20px !important;
+  color: var(--muted) !important;
+  font-size: 11px !important;
+  padding: 6px 12px !important;
+  height: auto !important;
+  min-width: 0 !important;
+  max-width: 130px !important;
+}
+
+/* ═══════════════════════════════
+   TABS
+═══════════════════════════════ */
+.tabs {
+  display: flex; gap: 0; padding: 10px 14px;
+  background: rgba(10,14,26,0.7); backdrop-filter: blur(10px);
+  overflow-x: auto; scrollbar-width: none;
+  border-bottom: 1px solid var(--glass-b);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: 1; min-width: fit-content; padding: 7px 13px;
+  border-radius: 20px; font-size: 11px; font-weight: 700;
+  color: var(--muted); cursor: pointer; transition: all 0.2s;
+  white-space: nowrap; text-align: center; border: 1px solid transparent;
+}
+.tab.active {
+  background: linear-gradient(135deg, var(--ton-blue), var(--diamond));
+  color: white; box-shadow: 0 3px 12px rgba(0,136,204,0.4);
+}
+
+/* ═══════════════════════════════
+   CONTENT AREAS
+═══════════════════════════════ */
+.content { flex: 1; padding: 14px 16px; display: none; animation: fadeIn 0.2s ease; }
+.content.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+.spacer { height: 90px; }
+
+/* ═══════════════════════════════
+   CARDS
+═══════════════════════════════ */
+.card {
+  background: var(--glass); border: 1px solid var(--glass-b);
+  border-radius: var(--r); padding: 18px; margin-bottom: 12px;
+  backdrop-filter: blur(10px); transition: border-color 0.2s, transform 0.15s;
+}
+.card:active { transform: scale(0.99); }
+
+.hero-card {
+  background: linear-gradient(135deg, rgba(0,136,204,0.14), rgba(0,212,255,0.07));
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: var(--r); padding: 22px; margin-bottom: 14px;
+  position: relative; overflow: hidden;
+}
+.hero-card::after {
+  content: ''; position: absolute; top: -50px; right: -50px;
+  width: 160px; height: 160px;
+  background: radial-gradient(circle, rgba(0,212,255,0.1), transparent 70%);
+  pointer-events: none;
+}
+
+.section-title {
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 10px; padding-left: 2px;
+}
+
+/* ═══════════════════════════════
+   HERO STATS
+═══════════════════════════════ */
+.hero-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 4px; }
+.hero-value { font-size: 30px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(90deg,white,var(--diamond)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.hero-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+.diamond-row {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(0,212,255,0.06); border: 1px solid rgba(0,212,255,0.15);
+  border-radius: var(--r-sm); padding: 12px 14px; margin-bottom: 12px;
+}
+.dm-icon { font-size: 24px; filter: drop-shadow(0 0 8px rgba(0,212,255,0.6)); }
+.dm-amount { font-size: 22px; font-weight: 800; color: var(--diamond); }
+.dm-label { font-size: 10px; color: var(--muted); }
+.dm-right { margin-left: auto; text-align: right; font-size: 10px; color: var(--muted); line-height: 1.5; }
+
+/* ═══════════════════════════════
+   BADGES DE ROL
+═══════════════════════════════ */
+.roles-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.badge { display: flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 20px; font-size: 10px; font-weight: 700; border: 1px solid; }
+.badge.donador  { background:rgba(0,212,255,0.08);  border-color:rgba(0,212,255,0.3);  color:var(--diamond); }
+.badge.emprendedor { background:rgba(255,215,0,0.08); border-color:rgba(255,215,0,0.3); color:var(--gold); }
+.badge.ballena  { background:rgba(199,125,255,0.1); border-color:rgba(199,125,255,0.35);color:var(--purple); }
+.badge.none     { background:var(--glass);           border-color:var(--glass-b);       color:var(--muted); font-size:11px; }
+
+/* ═══════════════════════════════
+   STATS GRID
+═══════════════════════════════ */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 14px; }
+.stat { background: var(--glass); border: 1px solid var(--glass-b); border-radius: var(--r-sm); padding: 13px; }
+.stat-l { font-size: 9px; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; }
+.stat-v { font-size: 19px; font-weight: 800; }
+.c-cyan { color: var(--diamond); } .c-green { color: var(--green); } .c-gold { color: var(--gold); } .c-purple { color: var(--purple); }
+
+/* ═══════════════════════════════
+   PROGRESS
+═══════════════════════════════ */
+.prog-wrap { margin: 9px 0; }
+.prog-info { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-bottom: 5px; }
+.prog-bar { height: 5px; background: var(--glass-b); border-radius: 10px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, var(--ton-blue), var(--diamond)); transition: width 1s ease; }
+.prog-fill.green { background: linear-gradient(90deg, #00b248, var(--green)); }
+
+/* ═══════════════════════════════
+   PROYECTO CARD
+═══════════════════════════════ */
+.p-card {
+  background: var(--navy-light); border: 1px solid var(--glass-b);
+  border-radius: var(--r); padding: 15px; margin-bottom: 11px;
+  cursor: pointer; transition: all 0.2s;
+}
+.p-card:hover, .p-card:active { border-color: rgba(0,136,204,0.4); transform: translateY(-1px); }
+.p-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.p-name { font-size: 14px; font-weight: 800; margin-bottom: 2px; }
+.p-cat { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.p-status { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 10px; white-space: nowrap; }
+.ps-activo   { background:rgba(0,230,118,0.1);  color:var(--green); }
+.ps-votacion { background:rgba(255,215,0,0.1);  color:var(--gold);  }
+.ps-exito    { background:rgba(0,212,255,0.1);  color:var(--diamond);}
+.p-desc { font-size: 11px; color: var(--muted); line-height: 1.55; margin-bottom: 11px; }
+.p-meta { display: flex; gap: 10px; font-size: 10px; color: var(--muted); flex-wrap: wrap; }
+
+/* ═══════════════════════════════
+   BOTONES
+═══════════════════════════════ */
+.btn { width:100%; padding:14px; border-radius:var(--r-sm); font-size:14px; font-weight:800; letter-spacing:0.2px; cursor:pointer; border:none; transition:all 0.18s; font-family:inherit; }
+.btn-primary { background:linear-gradient(135deg,var(--ton-blue),var(--diamond)); color:white; box-shadow:0 4px 18px rgba(0,136,204,0.35); }
+.btn-primary:active { transform:scale(0.98); }
+.btn-secondary { background:var(--glass); border:1px solid var(--glass-b); color:var(--text); }
+.btn-gold { background:linear-gradient(135deg,var(--gold-dark),var(--gold)); color:#0A0E1A; font-weight:900; box-shadow:0 4px 18px rgba(255,215,0,0.2); }
+.btn-green { background:rgba(0,230,118,0.12); border:1px solid rgba(0,230,118,0.3); color:var(--green); font-weight:800; }
+.btn-red { background:rgba(255,107,107,0.12); border:1px solid rgba(255,107,107,0.3); color:var(--red); font-weight:800; }
+.btn-sm { padding:9px 16px; width:auto; font-size:12px; border-radius:var(--r-sm); }
+
+/* ═══════════════════════════════
+   INPUTS
+═══════════════════════════════ */
+.inp-label { font-size:10px; color:var(--muted); margin-bottom:5px; display:block; letter-spacing:0.5px; text-transform:uppercase; }
+.inp {
+  width:100%; background:var(--navy-light); border:1px solid var(--glass-b);
+  border-radius:var(--r-sm); padding:12px 14px; color:var(--text);
+  font-size:15px; font-family:inherit; outline:none; transition:border-color 0.2s;
+  -webkit-appearance:none;
+}
+.inp:focus { border-color:var(--ton-blue); }
+.inp::placeholder { color:var(--muted); }
+textarea.inp { min-height:90px; resize:vertical; }
+.inp-group { margin-bottom:12px; }
+.chips { display:flex; gap:7px; margin-top:7px; flex-wrap:wrap; }
+.chip {
+  padding:7px 13px; background:var(--glass); border:1px solid var(--glass-b);
+  border-radius:var(--r-sm); font-size:11px; font-weight:600; color:var(--muted);
+  cursor:pointer; transition:all 0.18s;
+}
+.chip.sel, .chip:active { border-color:var(--ton-blue); color:var(--ton-light); background:rgba(0,136,204,0.1); }
+
+/* ═══════════════════════════════
+   DIAMOND PREVIEW
+═══════════════════════════════ */
+.dm-preview {
+  background:rgba(0,212,255,0.06); border:1px dashed rgba(0,212,255,0.25);
+  border-radius:var(--r-sm); padding:12px 14px; margin:10px 0;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.dm-preview-val { font-size:17px; font-weight:800; color:var(--diamond); }
+
+/* ═══════════════════════════════
+   INFO BOX
+═══════════════════════════════ */
+.info-box {
+  background:rgba(0,136,204,0.07); border:1px solid rgba(0,136,204,0.18);
+  border-radius:var(--r-sm); padding:11px 13px; font-size:11px;
+  color:var(--muted); line-height:1.6; margin:9px 0;
+}
+.info-box strong { color:var(--ton-light); }
+
+/* ═══════════════════════════════
+   VOTE CARD
+═══════════════════════════════ */
+.vote-card {
+  background:var(--navy-light); border:1px solid var(--glass-b);
+  border-radius:var(--r); padding:16px; margin-bottom:11px;
+}
+.vote-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.vote-title { font-size:13px; font-weight:800; }
+.vote-timer { font-size:10px; color:var(--gold); background:rgba(255,215,0,0.1); padding:3px 9px; border-radius:10px; }
+.vote-desc { font-size:11px; color:var(--muted); line-height:1.6; margin-bottom:12px; }
+.vote-btns { display:flex; gap:8px; }
+.v-yes { flex:1; padding:10px; background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.28); color:var(--green); border-radius:var(--r-sm); font-size:12px; font-weight:800; cursor:pointer; transition:background 0.18s; font-family:inherit; }
+.v-no  { flex:1; padding:10px; background:rgba(255,107,107,0.1); border:1px solid rgba(255,107,107,0.28); color:var(--red); border-radius:var(--r-sm); font-size:12px; font-weight:800; cursor:pointer; transition:background 0.18s; font-family:inherit; }
+.v-yes:active { background:rgba(0,230,118,0.22); }
+.v-no:active  { background:rgba(255,107,107,0.22); }
+.vote-pct { display:flex; gap:8px; font-size:10px; margin-top:8px; }
+
+/* ═══════════════════════════════
+   RANKING
+═══════════════════════════════ */
+.rank-item { display:flex; align-items:center; gap:11px; padding:11px 0; border-bottom:1px solid var(--glass-b); }
+.rank-item:last-child { border-bottom:none; }
+.rank-n { width:22px; text-align:center; font-size:12px; font-weight:800; color:var(--muted); }
+.rank-n.top { color:var(--gold); }
+.rank-av { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+.rank-info { flex:1; min-width:0; }
+.rank-name { font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rank-role { font-size:9px; color:var(--muted); }
+.rank-dm { font-size:12px; font-weight:800; color:var(--diamond); white-space:nowrap; }
+
+/* ═══════════════════════════════
+   WHITEPAPER
+═══════════════════════════════ */
+.wp-pill { display:inline-flex; align-items:center; gap:6px; background:rgba(0,136,204,0.1); border:1px solid rgba(0,136,204,0.22); border-radius:20px; padding:5px 12px; font-size:10px; font-weight:700; color:var(--ton-light); margin-bottom:14px; }
+.wp-h3 { font-size:12px; font-weight:800; color:var(--diamond); margin-bottom:7px; letter-spacing:0.3px; text-transform:uppercase; }
+.wp-p { font-size:11px; color:var(--muted); line-height:1.75; margin-bottom:8px; }
+.wp-table { width:100%; border-collapse:collapse; font-size:10px; margin:8px 0; }
+.wp-table th { color:var(--muted); font-weight:700; padding:5px 7px; border-bottom:1px solid var(--glass-b); text-align:left; letter-spacing:0.4px; }
+.wp-table td { padding:7px 7px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.wp-table tr:last-child td { border-bottom:none; }
+.dist-row { display:flex; align-items:center; gap:9px; margin-bottom:7px; }
+.dist-label { font-size:10px; color:var(--muted); width:120px; flex-shrink:0; }
+.dist-track { flex:1; height:7px; background:var(--glass-b); border-radius:10px; overflow:hidden; }
+.dist-fill { height:100%; border-radius:10px; }
+.dist-pct { font-size:10px; font-weight:800; width:28px; text-align:right; }
+
+/* ═══════════════════════════════
+   PERFIL
+═══════════════════════════════ */
+.profile-header {
+  background:linear-gradient(135deg,rgba(0,136,204,0.12),rgba(0,212,255,0.06));
+  border:1px solid rgba(0,212,255,0.15); border-radius:var(--r);
+  padding:20px; margin-bottom:12px; text-align:center;
+}
+.profile-avatar { font-size:52px; margin-bottom:10px; }
+.profile-name { font-size:18px; font-weight:800; margin-bottom:3px; }
+.profile-address { font-size:10px; color:var(--muted); font-family:monospace; }
+.ref-box { background:var(--navy-light); border:1px solid var(--glass-b); border-radius:var(--r-sm); padding:12px 14px; display:flex; align-items:center; gap:10px; cursor:pointer; }
+.ref-code { font-size:13px; font-weight:800; color:var(--diamond); font-family:monospace; flex:1; }
+.ref-copy { font-size:10px; color:var(--muted); }
+
+/* ═══════════════════════════════
+   MODAL (hoja inferior)
+═══════════════════════════════ */
+.modal { position:fixed; inset:0; z-index:600; display:none; align-items:flex-end; background:rgba(0,0,0,0.55); backdrop-filter:blur(6px); }
+.modal.open { display:flex; }
+.modal-body { background:var(--navy-mid); border-top:1px solid var(--glass-b); border-radius:20px 20px 0 0; width:100%; padding:22px 18px 36px; max-height:82vh; overflow-y:auto; animation:slideUp 0.3s cubic-bezier(.16,1,.3,1); }
+.modal-handle { width:38px; height:4px; background:var(--glass-b); border-radius:10px; margin:0 auto 18px; }
+.modal-title { font-size:16px; font-weight:800; margin-bottom:3px; }
+.modal-sub { font-size:11px; color:var(--muted); margin-bottom:18px; line-height:1.5; }
+
+/* ═══════════════════════════════
+   TOAST
+═══════════════════════════════ */
+.toast {
+  position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(16px);
+  background:var(--navy-light); border:1px solid var(--glass-b);
+  border-radius:20px; padding:9px 20px; font-size:12px; font-weight:700;
+  z-index:999; opacity:0; transition:all 0.28s; white-space:nowrap;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4); pointer-events:none;
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.green { border-color:rgba(0,230,118,0.3); color:var(--green); }
+.toast.cyan  { border-color:rgba(0,212,255,0.3); color:var(--diamond); }
+.toast.gold  { border-color:rgba(255,215,0,0.3); color:var(--gold); }
+
+/* ═══════════════════════════════
+   BOTTOM NAV
+═══════════════════════════════ */
+.bottom-nav {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  width:100%; max-width:430px;
+  background:rgba(10,14,26,0.96); backdrop-filter:blur(20px);
+  border-top:1px solid var(--glass-b);
+  display:flex; padding:8px 0 14px; z-index:200;
+}
+.nav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer; padding:5px 0; transition:all 0.18s; }
+.nav-ico { font-size:19px; transition:transform 0.18s; }
+.nav-lbl { font-size:8px; font-weight:700; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase; }
+.nav-item.active .nav-lbl { color:var(--diamond); }
+.nav-item.active .nav-ico { transform:scale(1.18); filter:drop-shadow(0 0 7px rgba(0,212,255,0.5)); }
+
+/* ═══════════════════════════════
+   ACTIVITY FEED
+═══════════════════════════════ */
+.feed-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--glass-b); }
+.feed-item:last-child { border-bottom:none; }
+.feed-ico { font-size:18px; flex-shrink:0; }
+.feed-text { flex:1; font-size:11px; font-weight:600; line-height:1.35; }
+.feed-sub { font-size:9px; color:var(--muted); margin-top:1px; }
+.feed-val { font-size:11px; font-weight:800; white-space:nowrap; }
+
+/* ═══════════════════════════════
+   UTILIDADES
+═══════════════════════════════ */
+.divider { height:1px; background:var(--glass-b); margin:12px 0; }
+.flex-row { display:flex; align-items:center; gap:8px; }
+.flex-between { display:flex; justify-content:space-between; align-items:center; }
+.mt-sm { margin-top:8px; }
+.mt-md { margin-top:14px; }
+.text-muted { color:var(--muted); }
+.text-sm { font-size:11px; }
+.text-xs { font-size:9px; }
+.font-mono { font-family:monospace; }
+
+/* ═══════════════════════════════
+   RESPONSIVE TELEGRAM SAFE AREA
+═══════════════════════════════ */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════
+     LOADER
+══════════════════════ -->
+<div id="loader">
+  <div class="logo-big">💎</div>
+  <div class="loader-text">GROWFUND TON</div>
+  <div class="loader-bar"><div class="lb-fill"></div></div>
+</div>
+
+<!-- CANVAS PARTÍCULAS -->
+<canvas id="canvas"></canvas>
+
+<!-- ══════════════════════
+     OVERLAY BIENVENIDA
+══════════════════════ -->
+<div class="overlay" id="welcomeOverlay">
+  <div class="overlay-sheet">
+    <div class="ov-gem">💎</div>
+    <div class="ov-title">Bienvenido a GrowFund</div>
+    <div class="ov-sub">La plataforma de growfunding descentralizada en Telegram. Conecta tu billetera TON para unirte a la comunidad.</div>
+    <div class="ov-features">
+      <div class="ov-feat">
+        <div class="ov-feat-icon">💙</div>
+        <div class="ov-feat-text"><strong>Donadores</strong>Apoyá proyectos y ganá Diamantes que se convierten en tokens GFT</div>
+      </div>
+      <div class="ov-feat">
+        <div class="ov-feat-icon">⭐</div>
+        <div class="ov-feat-text"><strong>Emprendedores</strong>Presentá tu proyecto y recibí financiamiento de la comunidad</div>
+      </div>
+      <div class="ov-feat">
+        <div class="ov-feat-icon">🐋</div>
+        <div class="ov-feat-text"><strong>Ballenas</strong>Los mayores inversores tienen voto ponderado x3 en el Consejo</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btnConnect" onclick="initTonConnect()">
+      🔗 Conectar Billetera TON
+    </button>
+    <div class="ov-security">
+      <strong>🔒 Sin transferencia de activos.</strong> Solo vinculamos tu dirección TON para identificarte.<br>Tus fondos permanecen en tu billetera en todo momento.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════
+     TOAST
+══════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<!-- ══════════════════════
+     MODAL: DONAR
+══════════════════════ -->
+<div class="modal" id="donateModal">
+  <div class="modal-body">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="dm-title">Donar al Proyecto</div>
+    <div class="modal-sub" id="dm-sub">Apoyá este emprendimiento y ganás diamantes</div>
+
+    <div class="inp-group">
+      <label class="inp-label">Monto en TON</label>
+      <input class="inp" type="number" id="donateAmt" placeholder="0.00" min="0.01" step="0.01" inputmode="decimal" oninput="calcDiamonds()">
+      <div class="chips" style="margin-top:8px">
+        <div class="chip" onclick="setAmt(0.1)">0.1 TON</div>
+        <div class="chip" onclick="setAmt(0.5)">0.5 TON</div>
+        <div class="chip" onclick="setAmt(1)">1 TON</div>
+        <div class="chip" onclick="setAmt(5)">5 TON</div>
+        <div class="chip" onclick="setAmt(10)">10 TON</div>
+      </div>
+    </div>
+
+    <div class="dm-preview">
+      <div>
+        <div class="text-xs text-muted">RECIBÍS EN DIAMANTES</div>
+        <div class="dm-preview-val" id="dm-prev">💎 0.00</div>
+      </div>
+      <div style="text-align:right;font-size:9px;color:var(--muted)">
+        Tasa x5<br><span style="color:var(--diamond)">→ Futuros tokens GFT</span>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <strong>¿Cómo funciona?</strong> Tu donación va directo al emprendedor. La app retiene el <strong style="color:var(--gold)">10%</strong> como fondo operativo del Consejo de votación. Recibirás diamantes que se convierten en tokens cuando el proyecto sea exitoso.
+    </div>
+
+    <button class="btn btn-primary mt-md" onclick="confirmDonate()">
+      💎 Confirmar Donación
+    </button>
+    <button class="btn btn-secondary" style="margin-top:8px;padding:11px;font-size:12px" onclick="closeModal('donateModal')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ══════════════════════
+     MODAL: PROPONER PROYECTO
+══════════════════════ -->
+<div class="modal" id="proposeModal">
+  <div class="modal-body">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Proponer Proyecto</div>
+    <div class="modal-sub">Completá el formulario y el Consejo votará en 48hs</div>
+
+    <div class="inp-group">
+      <label class="inp-label">Nombre del Proyecto</label>
+      <input class="inp" type="text" id="p-name" placeholder="Ej: AgroTech Entre Ríos">
+    </div>
+    <div class="inp-group">
+      <label class="inp-label">Categoría</label>
+      <select class="inp" id="p-cat">
+        <option value="">Seleccioná una categoría</option>
+        <option>🌱 Sustentabilidad</option>
+        <option>🤖 Tecnología</option>
+        <option>🌾 AgroTech</option>
+        <option>🛍 Comercio</option>
+        <option>🎓 Educación</option>
+        <option>🏥 Salud</option>
+        <option>🎨 Arte / Cultura</option>
+        <option>⚡ Energía</option>
+        <option>Otro</option>
+      </select>
+    </div>
+    <div class="inp-group">
+      <label class="inp-label">Descripción breve</label>
+      <textarea class="inp" id="p-desc" placeholder="¿Qué hace tu proyecto? ¿Qué problema resuelve? (mín. 100 caracteres)"></textarea>
+    </div>
+    <div class="inp-group">
+      <label class="inp-label">Fondos solicitados (en TON)</label>
+      <input class="inp" type="number" id="p-amount" placeholder="Ej: 500" inputmode="decimal">
+    </div>
+    <div class="inp-group">
+      <label class="inp-label">Plazo para recaudar</label>
+      <div class="chips">
+        <div class="chip" onclick="selPlazo(this,'15 días')">15 días</div>
+        <div class="chip" onclick="selPlazo(this,'30 días')">30 días</div>
+        <div class="chip" onclick="selPlazo(this,'45 días')">45 días</div>
+        <div class="chip" onclick="selPlazo(this,'60 días')">60 días</div>
+      </div>
+    </div>
+
+    <div class="info-box mt-md">
+      <strong>Proceso de aprobación:</strong> Una vez enviado, el Consejo (usuarios con diamantes) vota durante 48hs. Si supera el <strong style="color:var(--green)">66% de votos positivos</strong>, tu proyecto queda activo y empieza a recibir donaciones.
+    </div>
+
+    <button class="btn btn-gold mt-md" onclick="submitProposal()">
+      🚀 Enviar al Consejo
+    </button>
+    <button class="btn btn-secondary" style="margin-top:8px;padding:11px;font-size:12px" onclick="closeModal('proposeModal')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ══════════════════════
+     APP
+══════════════════════ -->
+<div id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">💎</div>
+      <div>
+        <div class="logo-name">GrowFund TON</div>
+        <div class="logo-tag">GROWFUNDING DESCENTRALIZADO</div>
+      </div>
+    </div>
+    <!-- TON Connect UI se inyecta aquí -->
+    <div id="ton-connect-root"></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs" id="mainTabs">
+    <div class="tab active" onclick="showTab('home',this)">🏠 Inicio</div>
+    <div class="tab" onclick="showTab('proyectos',this)">🚀 Proyectos</div>
+    <div class="tab" onclick="showTab('votar',this)">🗳 Votar</div>
+    <div class="tab" onclick="showTab('ranking',this)">🏆 Ranking</div>
+    <div class="tab" onclick="showTab('perfil',this)">👤 Perfil</div>
+    <div class="tab" onclick="showTab('wp',this)">📄 WP</div>
+  </div>
+
+  <!-- ══════ TAB: INICIO ══════ -->
+  <div class="content active" id="tab-home">
+
+    <div class="hero-card">
+      <div class="hero-label">POOL TOTAL RECAUDADO</div>
+      <div class="hero-value">12,847 TON</div>
+      <div class="hero-sub">≈ $71,300 USD · 38 proyectos activos</div>
+      <div class="prog-wrap" style="margin-top:14px">
+        <div class="prog-info"><span>Meta Trimestral: 20,000 TON</span><span>64%</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:64%"></div></div>
+      </div>
+    </div>
+
+    <div class="diamond-row">
+      <div class="dm-icon">💎</div>
+      <div>
+        <div class="dm-amount" id="userDiamonds">2,450</div>
+        <div class="dm-label">tus diamantes</div>
+      </div>
+      <div class="dm-right">
+        Valor futuro est.<br>
+        <span style="color:var(--diamond);font-weight:800">≈ 490 GFT</span>
+      </div>
+    </div>
+
+    <div class="roles-row" id="rolesRow">
+      <div class="badge donador">💙 Donador</div>
+      <div class="badge emprendedor">⭐ Emprendedor</div>
+    </div>
+
+    <div class="section-title">Tu Resumen</div>
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-l">Donado Total</div><div class="stat-v c-cyan">490 TON</div></div>
+      <div class="stat"><div class="stat-l">Retorno Est.</div><div class="stat-v c-green">+23.4%</div></div>
+      <div class="stat"><div class="stat-l">Proyectos</div><div class="stat-v">3</div></div>
+      <div class="stat"><div class="stat-l">Votos Emitidos</div><div class="stat-v c-gold">12</div></div>
+    </div>
+
+    <div class="section-title">Actividad Reciente</div>
+    <div class="card" style="padding:12px">
+      <div class="feed-item">
+        <div class="feed-ico">💎</div>
+        <div class="feed-info" style="flex:1"><div class="feed-text">Donaste 0.5 TON a EcoShop</div><div class="text-xs text-muted">hace 2h</div></div>
+        <div class="feed-val c-green">+2.5💎</div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-ico">🗳</div>
+        <div class="feed-info" style="flex:1"><div class="feed-text">Votaste a favor de AgroTech AR</div><div class="text-xs text-muted">hace 5h</div></div>
+        <div class="feed-val c-gold">✓ SÍ</div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-ico">🚀</div>
+        <div class="feed-info" style="flex:1"><div class="feed-text">Tu proyecto GreenPack aprobado</div><div class="text-xs text-muted">hace 1 día</div></div>
+        <div class="feed-val c-cyan">+150 TON</div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-ico">🐋</div>
+        <div class="feed-info" style="flex:1"><div class="feed-text">Nueva ballena en la comunidad</div><div class="text-xs text-muted">hace 2 días</div></div>
+        <div class="feed-val" style="color:var(--purple)">+500 TON</div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- ══════ TAB: PROYECTOS ══════ -->
+  <div class="content" id="tab-proyectos">
+
+    <div class="chips" style="margin-bottom:14px">
+      <div class="chip sel" onclick="filterP(this,'todos')">Todos</div>
+      <div class="chip" onclick="filterP(this,'activo')">🌱 Activos</div>
+      <div class="chip" onclick="filterP(this,'votacion')">🗳 En votación</div>
+      <div class="chip" onclick="filterP(this,'exito')">✅ Exitosos</div>
+    </div>
+
+    <div id="proyectosList">
+      <!-- JS inyecta los proyectos -->
+    </div>
+
+    <div class="card" style="text-align:center;padding:20px;cursor:pointer;margin-top:4px" onclick="openModal('proposeModal')">
+      <div style="font-size:28px;margin-bottom:7px">➕</div>
+      <div style="font-size:14px;font-weight:800;margin-bottom:3px">Proponer mi Proyecto</div>
+      <div class="text-sm text-muted">Presentá tu emprendimiento al Consejo de votación</div>
+    </div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- ══════ TAB: VOTAR ══════ -->
+  <div class="content" id="tab-votar">
+
+    <div class="info-box" style="margin-bottom:14px">
+      <strong>⚖️ Consejo de Votación</strong><br>
+      Tus diamantes otorgan poder de voto. Votá para aprobar o rechazar el financiamiento de proyectos con fondos del pool comunitario. Ballenas votan x3.
+    </div>
+
+    <div class="section-title">En Votación Activa</div>
+
+    <div class="vote-card">
+      <div class="vote-header">
+        <div class="vote-title">📦 GreenPack — 600 TON</div>
+        <div class="vote-timer">⏱ 5 días</div>
+      </div>
+      <div class="vote-desc">Packaging 100% biodegradable para e-commerce. Primer lote fabricado, buscan capital para distribución nacional. Proyecto verificado con convenios con 3 marketplaces.</div>
+      <div class="prog-wrap">
+        <div class="prog-info"><span>Votos a favor</span><span>73%</span></div>
+        <div class="prog-bar"><div class="prog-fill green" style="width:73%"></div></div>
+      </div>
+      <div class="vote-pct">
+        <span style="color:var(--green)">✅ 73% (146 votos)</span>
+        <span style="color:var(--red)">❌ 27% (54 votos)</span>
+      </div>
+      <div class="vote-btns" style="margin-top:11px">
+        <button class="v-yes" onclick="castVote(this,'GreenPack','SÍ')">✅ Aprobar</button>
+        <button class="v-no"  onclick="castVote(this,'GreenPack','NO')">❌ Rechazar</button>
+      </div>
+    </div>
+
+    <div class="vote-card">
+      <div class="vote-header">
+        <div class="vote-title">🤖 IA Tutores AR — 2,000 TON</div>
+        <div class="vote-timer">⏱ 11 días</div>
+      </div>
+      <div class="vote-desc">Plataforma de tutoría con IA para estudiantes secundarios de bajos recursos. Piloto exitoso en 3 escuelas de Rosario con mejora del 34% en comprensión lectora.</div>
+      <div class="prog-wrap">
+        <div class="prog-info"><span>Votos a favor</span><span>88%</span></div>
+        <div class="prog-bar"><div class="prog-fill green" style="width:88%"></div></div>
+      </div>
+      <div class="vote-pct">
+        <span style="color:var(--green)">✅ 88% (220 votos)</span>
+        <span style="color:var(--red)">❌ 12% (30 votos)</span>
+      </div>
+      <div class="vote-btns" style="margin-top:11px">
+        <button class="v-yes" onclick="castVote(this,'IA Tutores AR','SÍ')">✅ Aprobar</button>
+        <button class="v-no"  onclick="castVote(this,'IA Tutores AR','NO')">❌ Rechazar</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:6px">Historial de Votos</div>
+    <div class="card" style="padding:12px">
+      <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--glass-b)">
+        <span class="text-sm text-muted">AgroTech AR · 5,000 TON</span>
+        <span class="text-sm" style="color:var(--green);font-weight:700">✅ APROBADO · 91%</span>
+      </div>
+      <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--glass-b)">
+        <span class="text-sm text-muted">CryptoFood BA · 800 TON</span>
+        <span class="text-sm" style="color:var(--red);font-weight:700">❌ RECHAZADO · 61%</span>
+      </div>
+      <div class="flex-between" style="padding:8px 0">
+        <span class="text-sm text-muted">SolarKit Córdoba · 1,200 TON</span>
+        <span class="text-sm" style="color:var(--green);font-weight:700">✅ APROBADO · 78%</span>
+      </div>
+    </div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- ══════ TAB: RANKING ══════ -->
+  <div class="content" id="tab-ranking">
+
+    <div class="chips" style="margin-bottom:14px">
+      <div class="chip sel">💎 Diamantes</div>
+      <div class="chip">💰 Donado</div>
+      <div class="chip">🐋 Ballenas</div>
+    </div>
+
+    <div class="section-title">Top Donadores</div>
+    <div class="card" style="padding:12px">
+      <div class="rank-item">
+        <div class="rank-n top">🥇</div>
+        <div class="rank-av" style="background:rgba(255,215,0,0.12)">🐋</div>
+        <div class="rank-info"><div class="rank-name">cryptowhale_ar</div><div class="rank-role" style="color:var(--purple)">🐋 Ballena · Donador</div></div>
+        <div class="rank-dm">💎 48,200</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-n top">🥈</div>
+        <div class="rank-av" style="background:rgba(0,212,255,0.1)">🚀</div>
+        <div class="rank-info"><div class="rank-name">emprender_leo</div><div class="rank-role" style="color:var(--gold)">⭐ Emprendedor · Donador</div></div>
+        <div class="rank-dm">💎 31,500</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-n top">🥉</div>
+        <div class="rank-av" style="background:rgba(0,230,118,0.1)">💙</div>
+        <div class="rank-info"><div class="rank-name">inversor_rosario</div><div class="rank-role" style="color:var(--diamond)">💙 Donador</div></div>
+        <div class="rank-dm">💎 27,840</div>
+      </div>
+      <!-- TÚ (resaltado) -->
+      <div class="rank-item" style="border:1px solid rgba(0,212,255,0.22);border-radius:10px;padding:10px;margin:4px 0;background:rgba(0,212,255,0.03)">
+        <div class="rank-n" style="color:var(--diamond)">#4</div>
+        <div class="rank-av" style="background:rgba(0,136,204,0.12)">😊</div>
+        <div class="rank-info"><div class="rank-name" style="color:var(--diamond)" id="rankMyName">tú</div><div class="rank-role">💙 Donador · ⭐ Emprendedor</div></div>
+        <div class="rank-dm">💎 2,450</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-n">5</div>
+        <div class="rank-av" style="background:rgba(138,43,226,0.1)">🌊</div>
+        <div class="rank-info"><div class="rank-name">blockchain_ba</div><div class="rank-role" style="color:var(--purple)">🐋 Ballena</div></div>
+        <div class="rank-dm">💎 18,900</div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:6px">Beneficios por Rol</div>
+    <div class="card" style="padding:14px">
+      <div class="feed-item"><div class="feed-ico">💙</div><div style="flex:1"><div class="text-sm" style="font-weight:700">Donador</div><div class="text-xs text-muted">Desde 0.01 TON · Acceso a proyectos · Diamantes x5</div></div></div>
+      <div class="feed-item"><div class="feed-ico">⭐</div><div style="flex:1"><div class="text-sm" style="font-weight:700;color:var(--gold)">Emprendedor</div><div class="text-xs text-muted">Proponer proyectos · Recibir financiamiento · ROI proporcional</div></div></div>
+      <div class="feed-item"><div class="feed-ico">🐋</div><div style="flex:1"><div class="text-sm" style="font-weight:700;color:var(--purple)">Ballena</div><div class="text-xs text-muted">≥500 TON donado · Voto x3 en Consejo · Proyectos exclusivos</div></div></div>
+    </div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- ══════ TAB: PERFIL ══════ -->
+  <div class="content" id="tab-perfil">
+
+    <div class="profile-header">
+      <div class="profile-avatar" id="profAvatar">😊</div>
+      <div class="profile-name" id="profName">Usuario</div>
+      <div class="profile-address" id="profAddress">Conectá tu billetera TON</div>
+    </div>
+
+    <div class="section-title">Tu Código de Referido</div>
+    <div class="ref-box" onclick="copyRef()">
+      <div class="ref-code" id="refCode">GFT-XXXX</div>
+      <div class="ref-copy">📋 Copiar</div>
+    </div>
+    <div class="text-xs text-muted" style="margin-top:6px;margin-left:2px">Compartí tu código y ganá 10% de los diamantes de cada persona que traigas</div>
+
+    <div class="section-title" style="margin-top:16px">Mis Estadísticas</div>
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-l">Diamantes</div><div class="stat-v c-cyan">2,450</div></div>
+      <div class="stat"><div class="stat-l">TON Donado</div><div class="stat-v">490</div></div>
+      <div class="stat"><div class="stat-l">Proyectos</div><div class="stat-v c-gold">3</div></div>
+      <div class="stat"><div class="stat-l">Referidos</div><div class="stat-v c-green">7</div></div>
+    </div>
+
+    <div class="section-title">Mis Roles Activos</div>
+    <div class="roles-row">
+      <div class="badge donador">💙 Donador</div>
+      <div class="badge emprendedor">⭐ Emprendedor</div>
+    </div>
+    <div class="info-box">
+      <strong>🐋 Próximo nivel: Ballena</strong><br>
+      Te faltan <strong style="color:var(--gold)">10 TON</strong> más para alcanzar el rango Ballena y triplicar tu poder de voto en el Consejo.
+    </div>
+
+    <button class="btn btn-secondary" style="margin-top:8px;font-size:12px;padding:11px" onclick="disconnectWallet()">
+      🔌 Desconectar Billetera
+    </button>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- ══════ TAB: WHITEPAPER ══════ -->
+  <div class="content" id="tab-wp">
+    <div class="wp-pill">📄 Whitepaper v1.0 · Junio 2025</div>
+
+    <div class="card">
+      <div class="wp-h3">🎯 Resumen Ejecutivo</div>
+      <div class="wp-p">GrowFund TON es una plataforma de financiamiento colectivo (growfunding) descentralizada construida sobre TON (The Open Network), integrada nativamente en Telegram. Conecta emprendedores con donadores e inversores a través de un sistema de gobernanza comunitaria transparente, con smart contracts auditables y retorno proporcional para todos los participantes.</div>
+    </div>
+
+    <div class="card">
+      <div class="wp-h3">💎 Sistema de Diamantes</div>
+      <div class="wp-p">Los Diamantes son la unidad de recompensa interna. No tienen cotización externa pero registran tu participación y se convertirán en tokens GFT en la Fase 2.</div>
+      <table class="wp-table">
+        <tr><th>Donación TON</th><th>Diamantes 💎</th><th>Multiplicador</th></tr>
+        <tr><td>0.01 TON</td><td>0.05 💎</td><td>x5</td></tr>
+        <tr><td>0.1 TON</td><td>0.5 💎</td><td>x5</td></tr>
+        <tr><td>1 TON</td><td>5 💎</td><td>x5</td></tr>
+        <tr><td>10 TON</td><td>50 💎</td><td>x5</td></tr>
+        <tr><td>≥500 TON</td><td>2,500 + 🐋</td><td>x5 + Ballena</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="wp-h3">⚖️ Distribución de Fondos</div>
+      <div style="margin:10px 0">
+        <div class="dist-row">
+          <div class="dist-label">Emprendedor</div>
+          <div class="dist-track"><div class="dist-fill" style="width:90%;background:linear-gradient(90deg,var(--green),#4ADE80)"></div></div>
+          <div class="dist-pct" style="color:var(--green)">90%</div>
+        </div>
+        <div class="dist-row">
+          <div class="dist-label">Pool GrowFund</div>
+          <div class="dist-track"><div class="dist-fill" style="width:10%;background:linear-gradient(90deg,var(--ton-blue),var(--diamond))"></div></div>
+          <div class="dist-pct" style="color:var(--diamond)">10%</div>
+        </div>
+      </div>
+      <div class="wp-p" style="margin-top:8px">Del 10% del pool: 4% operaciones, 3% liquidez GFT, 2% recompensas comunidad, 1% reserva legal.</div>
+    </div>
+
+    <div class="card">
+      <div class="wp-h3">🗺 Roadmap</div>
+      <table class="wp-table">
+        <tr><th>Fase</th><th>Descripción</th><th>Estado</th></tr>
+        <tr><td>Q2 2025</td><td>Lanzamiento miniapp + Diamantes</td><td style="color:var(--green)">✅ Live</td></tr>
+        <tr><td>Q3 2025</td><td>Consejo de votación + 50 proyectos</td><td style="color:var(--gold)">🔄 Curso</td></tr>
+        <tr><td>Q4 2025</td><td>Token GFT en red TON</td><td style="color:var(--muted)">⏳ Próx.</td></tr>
+        <tr><td>Q1 2026</td><td>Expansión LATAM + Fiat on-ramp</td><td style="color:var(--muted)">⏳ Plan.</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="wp-h3">🔐 Seguridad y Transparencia</div>
+      <div class="wp-p">GrowFund TON nunca solicita transferencia de activos durante la conexión. Toda la lógica de distribución opera mediante smart contracts auditados en TON. El historial de votaciones es público e inmutable en la blockchain.</div>
+      <div class="info-box">
+        <strong>🔒 Auditoría:</strong> Smart contracts verificados. Código fuente abierto en GitHub. Informes trimestrales publicados en el canal oficial.
+      </div>
+    </div>
+
+    <button class="btn btn-gold" onclick="showToast('📄 Descarga disponible pronto','cyan')">
+      ⬇️ Descargar Whitepaper PDF
+    </button>
+    <div class="spacer"></div>
+  </div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav" id="bottomNav">
+  <div class="nav-item active" onclick="navTo('home',0,this)"><div class="nav-ico">🏠</div><div class="nav-lbl">Inicio</div></div>
+  <div class="nav-item" onclick="navTo('proyectos',1,this)"><div class="nav-ico">🚀</div><div class="nav-lbl">Proyectos</div></div>
+  <div class="nav-item" onclick="navTo('votar',2,this)"><div class="nav-ico">🗳</div><div class="nav-lbl">Votar</div></div>
+  <div class="nav-item" onclick="navTo('ranking',3,this)"><div class="nav-ico">🏆</div><div class="nav-lbl">Ranking</div></div>
+  <div class="nav-item" onclick="navTo('perfil',4,this)"><div class="nav-ico">👤</div><div class="nav-lbl">Perfil</div></div>
+  <div class="nav-item" onclick="navTo('wp',5,this)"><div class="nav-ico">📄</div><div class="nav-lbl">WP</div></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════
+   TELEGRAM WEB APP INIT
+═══════════════════════════════════ */
+const tg = window.Telegram?.WebApp;
+let tgUser = null;
+
+if (tg) {
+  tg.ready();
+  tg.expand();
+  try { tg.disableVerticalSwipes(); } catch(e){}
+  tgUser = tg.initDataUnsafe?.user;
+}
+
+/* ═══════════════════════════════════
+   ESTADO GLOBAL
+═══════════════════════════════════ */
+const state = {
+  walletConnected: false,
+  walletAddress: null,
+  diamonds: 2450,
+  tonDonated: 490,
+  plazoSel: '30 días',
+  currentProject: null,
+  filterProjects: 'todos'
+};
+
+/* ═══════════════════════════════════
+   PROYECTOS DATA
+═══════════════════════════════════ */
+const proyectos = [
+  {id:1, name:'🌿 EcoShop AR', cat:'Sustentabilidad · Argentina', desc:'Tienda de productos ecológicos con logística 100% verde. Expandiéndose a 5 provincias con fondo semilla de la comunidad.', raised:850, goal:1200, status:'activo', donors:24, days:12, roi:18},
+  {id:2, name:'🌾 AgroTech AR', cat:'AgriTech · Entre Ríos', desc:'Agricultura de precisión con sensores IoT para pequeños productores del Litoral argentino. Respaldado por el INTA.', raised:3200, goal:5000, status:'activo', donors:67, days:21, roi:34},
+  {id:3, name:'📦 GreenPack', cat:'Manufactura · CABA', desc:'Packaging 100% biodegradable para e-commerce. Primer lote fabricado, buscando capital de escala para distribución nacional.', raised:420, goal:600, status:'votacion', donors:19, days:5, roi:22},
+  {id:4, name:'🤖 IA Tutores AR', cat:'Educación · Rosario', desc:'Plataforma de tutoría con IA para estudiantes secundarios de bajos recursos. Resultados comprobados en escuelas piloto.', raised:1100, goal:2000, status:'votacion', donors:41, days:11, roi:0},
+  {id:5, name:'⚡ SolarKit Cba', cat:'Energía · Córdoba', desc:'Kits solares modulares para hogares de zonas rurales. Convenio con la Municipalidad de Río Cuarto.', raised:2800, goal:2800, status:'exito', donors:89, days:0, roi:28},
+];
+
+function renderProjects(filter) {
+  const list = document.getElementById('proyectosList');
+  const filtered = filter === 'todos' ? proyectos : proyectos.filter(p => p.status === filter);
+  list.innerHTML = filtered.map(p => {
+    const pct = Math.min(100, Math.round(p.raised / p.goal * 100));
+    const statusLabel = {activo:'● ACTIVO', votacion:'⚡ VOTACIÓN', exito:'✅ EXITOSO'}[p.status];
+    const statusClass = {activo:'ps-activo', votacion:'ps-votacion', exito:'ps-exito'}[p.status];
+    return `
+    <div class="p-card" onclick="openDonate(${p.id})">
+      <div class="p-top">
+        <div>
+          <div class="p-name">${p.name}</div>
+          <div class="p-cat">${p.cat}</div>
+        </div>
+        <div class="p-status ${statusClass}">${statusLabel}</div>
+      </div>
+      <div class="p-desc">${p.desc}</div>
+      <div class="prog-wrap">
+        <div class="prog-info"><span>${p.raised.toLocaleString()} / ${p.goal.toLocaleString()} TON</span><span>${pct}%</span></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="p-meta" style="margin-top:10px">
+        <span>👥 ${p.donors} donadores</span>
+        ${p.days > 0 ? `<span>⏳ ${p.days} días</span>` : '<span>🏁 Finalizado</span>'}
+        ${p.roi > 0 ? `<span>📈 ROI est. ${p.roi}%</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterP(el, f) {
+  document.querySelectorAll('.chips .chip').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  state.filterProjects = f;
+  renderProjects(f);
+}
+
+/* ═══════════════════════════════════
+   TON CONNECT
+═══════════════════════════════════ */
+let tonConnectUI = null;
+
+function initTonConnect() {
+  try {
+    if (typeof TON_CONNECT_UI !== 'undefined') {
+      tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+        // ⚠️ REEMPLAZAR con tu URL real después de desplegar
+        manifestUrl: 'https://TU-USUARIO.github.io/growfund-ton/tonconnect-manifest.json',
+        buttonRootId: 'ton-connect-root'
+      });
+      tonConnectUI.openModal();
+      tonConnectUI.onStatusChange(wallet => {
+        if (wallet) {
+          const addr = wallet.account.address;
+          onWalletConnected(addr);
+        }
+      });
+    } else {
+      // Fallback si CDN no carga (ej. prueba local)
+      simulateConnect();
+    }
+  } catch(e) {
+    simulateConnect();
+  }
+}
+
+function simulateConnect() {
+  // Solo para demo/testing — en producción usa TON Connect real
+  const fakeAddr = 'UQAb' + Math.random().toString(36).substr(2,4).toUpperCase() + '...k3mR';
+  onWalletConnected(fakeAddr);
+}
+
+function onWalletConnected(address) {
+  state.walletConnected = true;
+  state.walletAddress = address;
+  document.getElementById('welcomeOverlay').classList.add('hidden');
+  
+  // Actualizar perfil
+  const short = address.substring(0,6) + '...' + address.slice(-4);
+  document.getElementById('profAddress').textContent = short;
+  document.getElementById('refCode').textContent = 'GFT-' + address.substring(2,6).toUpperCase();
+  
+  // Usar datos de Telegram si disponibles
+  if (tgUser) {
+    const name = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
+    document.getElementById('profName').textContent = name;
+    document.getElementById('profAvatar').textContent = tgUser.first_name[0] + '😊'[0];
+    document.getElementById('rankMyName').textContent = '@' + (tgUser.username || tgUser.first_name);
+  }
+
+  haptic('success');
+  showToast('✅ Billetera conectada', 'green');
+}
+
+function disconnectWallet() {
+  if (tonConnectUI) tonConnectUI.disconnect();
+  state.walletConnected = false;
+  state.walletAddress = null;
+  document.getElementById('welcomeOverlay').classList.remove('hidden');
+  showToast('🔌 Billetera desconectada', '');
+}
+
+/* ═══════════════════════════════════
+   NAVEGACIÓN
+═══════════════════════════════════ */
+function showTab(id, el) {
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+  syncNav(id);
+  haptic('light');
+}
+
+function navTo(id, idx, el) {
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  el.classList.add('active');
+  const tabs = document.querySelectorAll('.tab');
+  if (tabs[idx]) tabs[idx].classList.add('active');
+  haptic('light');
+}
+
+function syncNav(id) {
+  const ids = ['home','proyectos','votar','ranking','perfil','wp'];
+  const idx = ids.indexOf(id);
+  document.querySelectorAll('.nav-item').forEach((n,i) => n.classList.toggle('active', i === idx));
+}
+
+/* ═══════════════════════════════════
+   DONACIONES
+═══════════════════════════════════ */
+function openDonate(projectId) {
+  const p = proyectos.find(x => x.id === projectId);
+  if (!p) return;
+  state.currentProject = p;
+  document.getElementById('dm-title').textContent = '💸 Donar a ' + p.name;
+  document.getElementById('dm-sub').textContent = p.desc.substring(0,80) + '...';
+  document.getElementById('donateAmt').value = '';
+  document.getElementById('dm-prev').textContent = '💎 0.00';
+  openModal('donateModal');
+  haptic('light');
+}
+
+function setAmt(v) {
+  document.getElementById('donateAmt').value = v;
+  calcDiamonds();
+  document.querySelectorAll('#donateModal .chip').forEach(c => {
+    c.classList.toggle('sel', c.textContent.startsWith(v));
+  });
+  haptic('light');
+}
+
+function calcDiamonds() {
+  const ton = parseFloat(document.getElementById('donateAmt').value) || 0;
+  document.getElementById('dm-prev').textContent = '💎 ' + (ton * 5).toFixed(2);
+}
+
+function confirmDonate() {
+  const ton = parseFloat(document.getElementById('donateAmt').value);
+  if (!ton || ton <= 0) { showToast('❗ Ingresá un monto válido', ''); return; }
+  const diamonds = ton * 5;
+  state.diamonds += diamonds;
+  state.tonDonated += ton;
+  document.getElementById('userDiamonds').textContent = Math.round(state.diamonds).toLocaleString();
+  closeModal('donateModal');
+  haptic('success');
+  showToast('💎 ¡Donación exitosa! +' + diamonds.toFixed(2) + ' diamantes', 'green');
+
+  // Ascenso a Ballena
+  if (state.tonDonated >= 500 && !document.querySelector('.badge.ballena')) {
+    const row = document.getElementById('rolesRow');
+    const b = document.createElement('div');
+    b.className = 'badge ballena';
+    b.textContent = '🐋 Ballena';
+    row.appendChild(b);
+    setTimeout(() => { showToast('🐋 ¡Sos Ballena! Voto x3 en el Consejo', 'gold'); haptic('success'); }, 2200);
+  }
+
+  // Actualizar proyecto en UI
+  renderProjects(state.filterProjects);
+}
+
+/* ═══════════════════════════════════
+   VOTAR
+═══════════════════════════════════ */
+function castVote(btn, project, vote) {
+  const parent = btn.closest('.vote-btns');
+  parent.querySelectorAll('button').forEach(b => b.disabled = true);
+  haptic('medium');
+  showToast((vote === 'SÍ' ? '✅' : '❌') + ' Voto emitido en ' + project, vote === 'SÍ' ? 'green' : '');
+  btn.textContent = vote === 'SÍ' ? '✅ Votado a favor' : '❌ Votado en contra';
+  btn.style.opacity = '0.6';
+}
+
+/* ═══════════════════════════════════
+   PROPONER PROYECTO
+═══════════════════════════════════ */
+function selPlazo(el, v) {
+  document.querySelectorAll('#proposeModal .chip').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  state.plazoSel = v;
+}
+
+function submitProposal() {
+  const name = document.getElementById('p-name').value.trim();
+  const desc = document.getElementById('p-desc').value.trim();
+  const amount = document.getElementById('p-amount').value;
+  const cat = document.getElementById('p-cat').value;
+  if (!name || !desc || !amount || !cat) { showToast('❗ Completá todos los campos', ''); return; }
+  if (desc.length < 50) { showToast('❗ La descripción es muy corta', ''); return; }
+  closeModal('proposeModal');
+  haptic('success');
+  showToast('🚀 Proyecto enviado al Consejo', 'cyan');
+}
+
+/* ═══════════════════════════════════
+   MODALES
+═══════════════════════════════════ */
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Cerrar modales al tocar el fondo
+document.querySelectorAll('.modal').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
+});
+
+/* ═══════════════════════════════════
+   REFERIDO
+═══════════════════════════════════ */
+function copyRef() {
+  const code = document.getElementById('refCode').textContent;
+  const text = `🔥 Unite a GrowFund TON con mi código ${code} y empezá a ganar diamantes apoyando emprendedores: https://t.me/GrowFundTONbot/app`;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('📋 Enlace copiado', 'cyan');
+      // Compartir en Telegram si está disponible
+      if (tg) tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/GrowFundTONbot/app&text=🔥 Unite con mi código ${code}`);
+    });
+  } else {
+    showToast('📋 Código: ' + code, 'cyan');
+  }
+  haptic('medium');
+}
+
+/* ═══════════════════════════════════
+   HAPTIC FEEDBACK (solo en Telegram)
+═══════════════════════════════════ */
+function haptic(type) {
+  if (!tg) return;
+  try {
+    if (type === 'light')   tg.HapticFeedback.impactOccurred('light');
+    if (type === 'medium')  tg.HapticFeedback.impactOccurred('medium');
+    if (type === 'success') tg.HapticFeedback.notificationOccurred('success');
+  } catch(e) {}
+}
+
+/* ═══════════════════════════════════
+   TOAST
+═══════════════════════════════════ */
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ═══════════════════════════════════
+   CANVAS PARTÍCULAS FLOTANTES
+═══════════════════════════════════ */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
+resize(); window.addEventListener('resize', resize);
+
+class Particle {
+  constructor() { this.reset(true); }
+  reset(init) {
+    this.x = Math.random() * canvas.width;
+    this.y = init ? Math.random() * canvas.height : canvas.height + 10;
+    this.s = Math.random() * 3.5 + 1.5;
+    this.vy = Math.random() * 0.35 + 0.08;
+    this.vx = (Math.random() - 0.5) * 0.25;
+    this.o = Math.random() * 0.45 + 0.08;
+    this.r = Math.random() * Math.PI;
+  }
+  update() { this.y -= this.vy; this.x += this.vx; this.r += 0.01; if (this.y < -10) this.reset(); }
+  draw() {
+    ctx.save(); ctx.globalAlpha = this.o;
+    ctx.translate(this.x, this.y); ctx.rotate(this.r);
+    ctx.fillStyle = Math.random() > 0.5 ? '#00D4FF' : '#0088CC';
+    ctx.fillRect(-this.s/2, -this.s/2, this.s, this.s);
+    ctx.restore();
+  }
+}
+const particles = Array.from({length:45}, () => new Particle());
+(function loop() { ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach(p=>{p.update();p.draw();}); requestAnimationFrame(loop); })();
+
+/* ═══════════════════════════════════
+   INIT
+═══════════════════════════════════ */
+renderProjects('todos');
+
+// Ocultar loader después de 1.8s
+setTimeout(() => {
+  const loader = document.getElementById('loader');
+  loader.style.transition = 'opacity 0.4s';
+  loader.style.opacity = '0';
+  setTimeout(() => loader.style.display = 'none', 400);
+  
+  // Si ya hay datos de Telegram, mostrar app directamente
+  // (usuario ya conectado en otra sesión — en producción verificar token)
+  if (tgUser) {
+    // Aquí podrías verificar si el usuario ya conectó billetera antes
+    // Por ahora mostramos el overlay de bienvenida siempre
+  }
+}, 1800);
+</script>
+{
+  "url": "https://TU-USUARIO.github.io/growfund-ton",
+  "name": "GrowFund TON",
+  "iconUrl": "https://TU-USUARIO.github.io/growfund-ton/icon.png"
+}
+
+</body>
+</html>
