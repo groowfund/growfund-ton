@@ -1048,7 +1048,7 @@ function initTonConnect() {
     if (typeof TON_CONNECT_UI !== 'undefined') {
       tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
         // ⚠️ REEMPLAZAR con tu URL real después de desplegar
-        manifestUrl: 'https://TU-USUARIO.github.io/growfund-ton/tonconnect-manifest.json',
+        manifestUrl: 'https://GroowFund.github.io/growfund-ton/tonconnect-manifest.json',
         buttonRootId: 'ton-connect-root'
       });
       tonConnectUI.openModal();
