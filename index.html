@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GrowFund TON</title>
+
+<!-- TON Connect UI -->
+<script src="https://unpkg.com/@tonconnect/ui@latest/dist/tonconnect-ui.min.js"></script>
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<!-- Telegram WebApp -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+  :root {
+    --navy: #0A0E1A;
+    --navy-mid: #111827;
+    --navy-light: #1C2537;
+    --ton-blue: #0088CC;
+    --ton-blue-light: #00AAFF;
+    --diamond: #00D4FF;
+    --diamond-pale: rgba(0,212,255,0.12);
+    --green: #00E676;
+    --gold: #FFD700;
+    --gold-dark: #B8860B;
+    --red: #FF4444;
+    --text: #E8EDF5;
+    --text-muted: #7A8BA0;
+    --glass: rgba(255,255,255,0.04);
+    --glass-border: rgba(255,255,255,0.08);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--navy);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #canvas {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 0; opacity: 0.35;
+  }
+
+  #app {
+    position: relative; z-index: 1;
+    max-width: 430px; margin: 0 auto;
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 16px 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(10,14,26,0.9); backdrop-filter: blur(20px);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--ton-blue), var(--diamond));
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; box-shadow: 0 0 20px rgba(0,212,255,0.3);
+  }
+  .logo-text {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+    background: linear-gradient(90deg, #fff 60%, var(--diamond));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  /* TON Connect button override */
+  #ton-connect-btn {
+    display: flex; align-items: center;
+  }
+  #ton-connect-btn tc-root { --tc-border-radius: 20px; }
+
+  .wallet-status {
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: 20px; padding: 6px 14px;
+    color: var(--text-muted); font-size: 12px; cursor: pointer;
+    transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+  }
+  .wallet-status.connected {
+    border-color: rgba(0,230,118,0.4); color: var(--green);
+    background: rgba(0,230,118,0.06);
+  }
+  .wallet-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 6px var(--green);
+  }
+
+  /* BOTTOM NAV */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 430px;
+    background: rgba(10,14,26,0.97); backdrop-filter: blur(20px);
+    border-top: 1px solid var(--glass-border);
+    display: flex; padding: 8px 0 env(safe-area-inset-bottom, 12px); z-index: 200;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 4px; cursor: pointer; padding: 6px 0; transition: all 0.2s;
+  }
+  .nav-icon { font-size: 20px; transition: transform 0.2s; }
+  .nav-label { font-size: 9px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.5px; }
+  .nav-item.active .nav-label { color: var(--diamond); }
+  .nav-item.active .nav-icon { transform: scale(1.15); filter: drop-shadow(0 0 8px rgba(0,212,255,0.5)); }
+
+  /* SCREENS */
+  .screen { display: none; flex: 1; padding: 16px 16px 90px; overflow-y: auto; }
+  .screen.active { display: block; }
+
+  /* CARDS */
+  .card {
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 12px;
+    backdrop-filter: blur(10px); transition: border-color 0.2s, transform 0.15s;
+  }
+  .card:active { transform: scale(0.99); }
+
+  .hero-card {
+    background: linear-gradient(135deg, rgba(0,136,204,0.15), rgba(0,212,255,0.08));
+    border: 1px solid rgba(0,212,255,0.2); border-radius: var(--radius);
+    padding: 22px; margin-bottom: 16px; position: relative; overflow: hidden;
+  }
+  .hero-card::before {
+    content: ''; position: absolute; top: -40px; right: -40px;
+    width: 150px; height: 150px;
+    background: radial-gradient(circle, rgba(0,212,255,0.12), transparent 70%);
+    pointer-events: none;
+  }
+
+  .section-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; padding-left: 2px;
+  }
+
+  /* STATS GRID */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-cell {
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm); padding: 14px;
+  }
+  .stat-label { font-size: 10px; color: var(--text-muted); margin-bottom: 4px; }
+  .stat-value { font-size: 18px; font-weight: 700; }
+  .c-cyan { color: var(--diamond); }
+  .c-green { color: var(--green); }
+  .c-gold { color: var(--gold); }
+  .c-purple { color: #C77DFF; }
+
+  /* DIAMOND ROW */
+  .diamond-row {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(0,212,255,0.06); border: 1px solid rgba(0,212,255,0.15);
+    border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 14px;
+  }
+  .diamond-amount { font-size: 22px; font-weight: 800; color: var(--diamond); }
+  .diamond-info { margin-left: auto; font-size: 10px; color: var(--text-muted); text-align: right; line-height: 1.5; }
+
+  /* ROLES */
+  .roles-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .role-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 11px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; border: 1px solid;
+  }
+  .role-badge.donador { background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.3); color: var(--diamond); }
+  .role-badge.emprendedor { background: rgba(255,215,0,0.08); border-color: rgba(255,215,0,0.3); color: var(--gold); }
+  .role-badge.ballena { background: rgba(138,43,226,0.1); border-color: rgba(138,43,226,0.4); color: #C77DFF; }
+
+  /* PROGRESS BAR */
+  .progress-wrap { margin: 10px 0; }
+  .progress-info { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+  .progress-bar { height: 6px; background: var(--glass-border); border-radius: 10px; overflow: hidden; }
+  .progress-fill {
+    height: 100%; border-radius: 10px;
+    background: linear-gradient(90deg, var(--ton-blue), var(--diamond)); transition: width 1s ease;
+  }
+  .progress-fill.green { background: linear-gradient(90deg, var(--green), #4ADE80); }
+
+  /* PROJECT CARD */
+  .proyecto-card {
+    background: var(--navy-light); border: 1px solid var(--glass-border);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .proyecto-card:active { transform: scale(0.98); border-color: rgba(0,136,204,0.4); }
+  .proyecto-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .proyecto-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+  .proyecto-cat { font-size: 10px; color: var(--text-muted); }
+  .proyecto-status { font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 10px; white-space: nowrap; }
+  .proyecto-status.activo { background: rgba(0,230,118,0.1); color: var(--green); }
+  .proyecto-status.votacion { background: rgba(255,215,0,0.1); color: var(--gold); }
+  .proyecto-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; }
+  .proyecto-meta { display: flex; gap: 12px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
+
+  /* VOTE CARD */
+  .vote-card {
+    background: var(--navy-light); border: 1px solid var(--glass-border);
+    border-radius: var(--radius); padding: 18px; margin-bottom: 12px;
+  }
+  .vote-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .vote-title { font-size: 14px; font-weight: 700; }
+  .vote-timer { font-size: 11px; color: var(--gold); background: rgba(255,215,0,0.1); padding: 4px 10px; border-radius: 10px; }
+  .vote-desc { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px; }
+  .vote-btns { display: flex; gap: 8px; }
+  .vote-yes, .vote-no {
+    flex: 1; padding: 10px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: inherit;
+  }
+  .vote-yes { background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.3); color: var(--green); }
+  .vote-no { background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.3); color: #FF6B6B; }
+  .vote-yes:active { background: rgba(0,230,118,0.25); }
+  .vote-no:active { background: rgba(255,68,68,0.25); }
+  .vote-result { display: flex; gap: 8px; margin-top: 10px; font-size: 11px; flex-wrap: wrap; }
+  .vr-yes { color: var(--green); }
+  .vr-no { color: #FF6B6B; }
+
+  /* RANKING */
+  .rank-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--glass-border);
+  }
+  .rank-item:last-child { border-bottom: none; }
+  .rank-num { width: 24px; text-align: center; font-size: 13px; font-weight: 700; color: var(--text-muted); }
+  .rank-num.top { color: var(--gold); }
+  .rank-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .rank-info { flex: 1; }
+  .rank-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .rank-role { font-size: 10px; color: var(--text-muted); }
+  .rank-diamonds { font-size: 13px; font-weight: 700; color: var(--diamond); }
+
+  /* BUTTONS */
+  .btn {
+    width: 100%; padding: 14px; border-radius: var(--radius-sm);
+    font-size: 15px; font-weight: 700; cursor: pointer; border: none;
+    transition: all 0.2s; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--ton-blue), var(--diamond));
+    color: white; box-shadow: 0 4px 20px rgba(0,136,204,0.3);
+  }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-secondary { background: var(--glass); border: 1px solid var(--glass-border); color: var(--text); }
+  .btn-gold {
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+    color: #0A0E1A; box-shadow: 0 4px 20px rgba(255,215,0,0.2);
+  }
+  .btn-danger { background: rgba(255,68,68,0.15); border: 1px solid rgba(255,68,68,0.3); color: #FF6B6B; }
+
+  /* INPUT */
+  .input-group { margin-bottom: 14px; }
+  .input-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: block; letter-spacing: 0.4px; }
+  .input-field {
+    width: 100%; background: var(--navy-light); border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm); padding: 12px 14px; color: var(--text);
+    font-size: 15px; font-family: inherit; outline: none; transition: border-color 0.2s;
+  }
+  .input-field:focus { border-color: var(--ton-blue); }
+  .input-field::placeholder { color: var(--text-muted); }
+  textarea.input-field { resize: none; min-height: 80px; }
+
+  .amounts-quick { display: flex; gap: 8px; margin-top: 8px; }
+  .amount-chip {
+    flex: 1; padding: 8px; background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: var(--radius-sm); font-size: 12px; color: var(--text-muted);
+    cursor: pointer; text-align: center; transition: all 0.2s;
+  }
+  .amount-chip:active, .amount-chip.sel {
+    border-color: var(--ton-blue); color: var(--ton-blue-light); background: rgba(0,136,204,0.1);
+  }
+
+  .diamond-preview {
+    background: rgba(0,212,255,0.06); border: 1px dashed rgba(0,212,255,0.25);
+    border-radius: var(--radius-sm); padding: 14px 16px; margin: 14px 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .dp-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+  .dp-value { font-size: 18px; font-weight: 800; color: var(--diamond); }
+
+  /* INFO BOX */
+  .info-box {
+    background: rgba(0,136,204,0.08); border: 1px solid rgba(0,136,204,0.2);
+    border-radius: var(--radius-sm); padding: 12px 14px; font-size: 12px;
+    color: var(--text-muted); line-height: 1.6; margin: 10px 0;
+  }
+  .info-box strong { color: var(--ton-blue-light); }
+
+  .warning-box {
+    background: rgba(255,215,0,0.06); border: 1px solid rgba(255,215,0,0.2);
+    border-radius: var(--radius-sm); padding: 12px 14px; font-size: 12px;
+    color: var(--text-muted); line-height: 1.6; margin: 10px 0;
+  }
+
+  /* MODAL */
+  .modal {
+    position: fixed; inset: 0; z-index: 600; display: none;
+    align-items: flex-end; background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+  }
+  .modal.open { display: flex; }
+  .modal-body {
+    background: var(--navy-mid); border-top: 1px solid var(--glass-border);
+    border-radius: 20px 20px 0 0; width: 100%; padding: 24px 20px;
+    max-height: 85vh; overflow-y: auto; animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle { width: 40px; height: 4px; background: var(--glass-border); border-radius: 10px; margin: 0 auto 20px; }
+  .modal-title { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+  .modal-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
+
+  /* OVERLAY */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(10,14,26,0.95);
+    backdrop-filter: blur(20px); z-index: 700;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .overlay.hidden { display: none; }
+  .overlay-card {
+    background: var(--navy-light); border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 20px; padding: 30px 24px; width: 100%; max-width: 360px; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(0,212,255,0.05);
+  }
+  .ov-icon { font-size: 54px; margin-bottom: 16px; filter: drop-shadow(0 0 20px rgba(0,212,255,0.5)); }
+  .ov-title { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+  .ov-sub { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 24px; }
+
+  /* LOADING SPINNER */
+  .spinner {
+    width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite;
+    display: inline-block; margin-right: 8px; vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--navy-light); border: 1px solid var(--glass-border);
+    border-radius: 20px; padding: 10px 20px; font-size: 13px; font-weight: 600;
+    z-index: 999; opacity: 0; transition: all 0.3s; white-space: nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 90%;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.green { border-color: rgba(0,230,118,0.3); color: var(--green); }
+  .toast.cyan { border-color: rgba(0,212,255,0.3); color: var(--diamond); }
+  .toast.red { border-color: rgba(255,68,68,0.3); color: #FF6B6B; }
+
+  /* TX STATUS */
+  .tx-status {
+    background: rgba(0,212,255,0.05); border: 1px solid rgba(0,212,255,0.15);
+    border-radius: var(--radius-sm); padding: 12px 16px; margin-top: 12px;
+    font-size: 12px; display: none;
+  }
+  .tx-status.visible { display: block; }
+  .tx-hash { color: var(--diamond); font-family: monospace; font-size: 11px; word-break: break-all; margin-top: 4px; }
+
+  /* WHITEPAPER */
+  .token-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(0,136,204,0.1); border: 1px solid rgba(0,136,204,0.25);
+    border-radius: 20px; padding: 6px 12px; font-size: 11px; font-weight: 600;
+    color: var(--ton-blue-light); margin-bottom: 14px;
+  }
+  .wp-section { margin-bottom: 20px; }
+  .wp-section h3 { font-size: 13px; font-weight: 700; color: var(--diamond); margin-bottom: 8px; }
+  .wp-section p { font-size: 12px; color: var(--text-muted); line-height: 1.7; margin-bottom: 6px; }
+  .wp-table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 10px 0; }
+  .wp-table th { color: var(--text-muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--glass-border); text-align: left; }
+  .wp-table td { padding: 8px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .wp-table tr:last-child td { border-bottom: none; }
+  .dist-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .dist-label { font-size: 11px; color: var(--text-muted); width: 130px; flex-shrink: 0; }
+  .dist-fill-wrap { flex: 1; height: 8px; background: var(--glass-border); border-radius: 10px; overflow: hidden; }
+  .dist-fill { height: 100%; border-radius: 10px; }
+  .dist-pct { font-size: 11px; font-weight: 700; width: 32px; text-align: right; }
+
+  /* FILTER CHIPS */
+  .filter-row { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    flex: none; padding: 7px 14px; background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: 20px; font-size: 12px; color: var(--text-muted);
+    cursor: pointer; white-space: nowrap; transition: all 0.2s;
+  }
+  .filter-chip.active { background: rgba(0,136,204,0.15); border-color: var(--ton-blue); color: var(--ton-blue-light); }
+
+  /* ACTIVITY ITEM */
+  .activity-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+  .activity-item + .activity-item { border-top: 1px solid var(--glass-border); }
+  .activity-icon { font-size: 20px; width: 32px; text-align: center; }
+  .activity-text { flex: 1; }
+  .activity-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .activity-time { font-size: 10px; color: var(--text-muted); }
+  .activity-badge { font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+  /* CREAR FORM */
+  .crear-steps { display: flex; gap: 6px; margin-bottom: 20px; }
+  .step-dot {
+    flex: 1; height: 3px; border-radius: 3px; background: var(--glass-border);
+    transition: background 0.3s;
+  }
+  .step-dot.active { background: var(--diamond); }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- WALLET CONNECT OVERLAY -->
+<div class="overlay" id="connectOverlay">
+  <div class="overlay-card">
+    <div class="ov-icon">💎</div>
+    <div class="ov-title">GrowFund TON</div>
+    <div class="ov-sub">Conecta tu billetera TON para participar en la comunidad de financiamiento colectivo descentralizado más transparente de Telegram.</div>
+    <div id="ton-connect-overlay-btn" style="margin-bottom:12px"></div>
+    <button class="btn btn-secondary" onclick="demoMode()" style="font-size:13px;padding:10px">
+      👁 Ver en modo demo
+    </button>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:14px;line-height:1.5">
+      <strong style="color:var(--green)">🔒 Sin transferencia de activos.</strong><br>
+      Solo vinculamos tu dirección TON para identificarte.
+    </div>
+  </div>
+</div>
+
+<!-- DONATE MODAL -->
+<div class="modal" id="donateModal">
+  <div class="modal-body">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalProjectName">💸 Donar al proyecto</div>
+    <div class="modal-sub" id="modalProjectDesc">Apoya este emprendimiento y gana diamantes</div>
+
+    <div class="input-group">
+      <label class="input-label">MONTO EN TON</label>
+      <input type="number" class="input-field" id="donateAmount" placeholder="0.00" oninput="calcDiamonds()" step="0.01" min="0.01">
+      <div class="amounts-quick">
+        <div class="amount-chip" onclick="setAmount(0.1)">0.1</div>
+        <div class="amount-chip" onclick="setAmount(0.5)">0.5</div>
+        <div class="amount-chip" onclick="setAmount(1)">1 TON</div>
+        <div class="amount-chip" onclick="setAmount(5)">5 TON</div>
+      </div>
+    </div>
+
+    <div class="diamond-preview">
+      <div>
+        <div class="dp-label">Recibirás en Diamantes</div>
+        <div class="dp-value" id="diamondPreview">💎 0.00</div>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);text-align:right">
+        Tasa: ×5<br><span style="color:var(--diamond)">→ Futuros GFT tokens</span>
+      </div>
+    </div>
+
+    <div class="info-box">
+      <strong>¿Cómo funciona?</strong> Tu donación va directamente al proyecto. La plataforma retiene <strong style="color:var(--gold)">10%</strong> como fondo operativo del Consejo. Recibirás diamantes que se convertirán en tokens GFT.
+    </div>
+
+    <div class="tx-status" id="txStatus">
+      <div id="txStatusText">⏳ Procesando transacción...</div>
+      <div class="tx-hash" id="txHash"></div>
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:14px" id="confirmDonateBtn" onclick="confirmDonate()">
+      💎 Confirmar Donación en TON
+    </button>
+    <button class="btn btn-secondary" style="margin-top:8px;font-size:13px;padding:10px" onclick="closeModal()">
+      Cancelar
+    </button>
+  </div>
+</div>
+
+<!-- CREAR PROYECTO MODAL -->
+<div class="modal" id="crearModal">
+  <div class="modal-body">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🚀 Proponer Proyecto</div>
+    <div class="modal-sub">Presenta tu emprendimiento al Consejo de Votación. El período de evaluación es de 30 días.</div>
+
+    <div class="input-group">
+      <label class="input-label">NOMBRE DEL PROYECTO</label>
+      <input type="text" class="input-field" id="newProjectName" placeholder="Ej: EcoShop Entre Ríos">
+    </div>
+    <div class="input-group">
+      <label class="input-label">CATEGORÍA</label>
+      <select class="input-field" id="newProjectCat" style="cursor:pointer">
+        <option value="tecnologia">💻 Tecnología</option>
+        <option value="sustentabilidad">🌱 Sustentabilidad</option>
+        <option value="agritech">🌾 AgriTech</option>
+        <option value="educacion">📚 Educación</option>
+        <option value="salud">🏥 Salud</option>
+        <option value="fintech">💰 FinTech</option>
+        <option value="otro">📦 Otro</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <label class="input-label">DESCRIPCIÓN</label>
+      <textarea class="input-field" id="newProjectDesc" placeholder="Describe tu proyecto, problema que resuelve y cómo usarás los fondos..."></textarea>
+    </div>
+    <div class="input-group">
+      <label class="input-label">META DE FINANCIAMIENTO (TON)</label>
+      <input type="number" class="input-field" id="newProjectGoal" placeholder="Ej: 1000" min="10">
+    </div>
+    <div class="warning-box">
+      <strong style="color:var(--gold)">⚠️ Importante:</strong> Al presentar tu proyecto aceptas que el Consejo evaluará la solicitud durante 30 días hábiles. El 10% de los fondos recaudados se destinará al pool operativo de GrowFund.
+    </div>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="submitProject()">
+      🚀 Enviar al Consejo
+    </button>
+    <button class="btn btn-secondary" style="margin-top:8px;font-size:13px;padding:10px" onclick="closeCrearModal()">
+      Cancelar
+    </button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">💎</div>
+      <div class="logo-text">GrowFund TON</div>
+    </div>
+    <div id="walletStatusBtn" class="wallet-status" onclick="handleWalletBtn()">
+      🔗 Conectar
+    </div>
+  </div>
+
+  <!-- HOME -->
+  <div class="screen active" id="screen-home">
+    <div class="hero-card">
+      <div style="font-size:10px;color:var(--text-muted);letter-spacing:0.5px;margin-bottom:6px">POOL TOTAL RECAUDADO</div>
+      <div style="font-size:30px;font-weight:800;letter-spacing:-1px;background:linear-gradient(90deg,white,var(--diamond));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">12,847 TON</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">≈ $71,300 USD · 38 proyectos activos</div>
+      <div class="progress-wrap" style="margin-top:16px">
+        <div class="progress-info"><span>Meta Trimestral</span><span>64%</span></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:64%"></div></div>
+      </div>
+    </div>
+
+    <div class="diamond-row">
+      <div style="font-size:24px;filter:drop-shadow(0 0 8px rgba(0,212,255,0.6))">💎</div>
+      <div>
+        <div class="diamond-amount" id="userDiamonds">0</div>
+        <div style="font-size:11px;color:var(--text-muted)">tus diamantes</div>
+      </div>
+      <div class="diamond-info">
+        Valor futuro estimado<br>
+        <span id="gftEstimate" style="color:var(--diamond);font-weight:700">≈ 0 GFT</span>
+      </div>
+    </div>
+
+    <div class="roles-row" id="rolesRow">
+      <div style="font-size:12px;color:var(--text-muted);padding:5px 0">Conecta tu billetera para ver tus roles</div>
+    </div>
+
+    <div class="section-title">TU RESUMEN</div>
+    <div class="stats-grid">
+      <div class="stat-cell">
+        <div class="stat-label">DONADO</div>
+        <div class="stat-value c-cyan" id="totalDonated">0 TON</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">RETORNO EST.</div>
+        <div class="stat-value c-green">+23.4%</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">PROYECTOS</div>
+        <div class="stat-value" id="projectCount">0</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">VOTOS EMITIDOS</div>
+        <div class="stat-value c-gold" id="voteCount">0</div>
+      </div>
+    </div>
+
+    <div class="section-title">ACTIVIDAD RECIENTE</div>
+    <div class="card" style="padding:14px" id="activityFeed">
+      <div class="activity-item">
+        <div class="activity-icon">💎</div>
+        <div class="activity-text">
+          <div class="activity-title">Donaste 0.5 TON a EcoShop AR</div>
+          <div class="activity-time">+2.5 diamantes · hace 2h</div>
+        </div>
+        <div class="activity-badge c-green">+2.5💎</div>
+      </div>
+      <div class="activity-item">
+        <div class="activity-icon">🗳</div>
+        <div class="activity-text">
+          <div class="activity-title">Votaste a favor de AgroTech AR</div>
+          <div class="activity-time">Consejo de votación · hace 5h</div>
+        </div>
+        <div class="activity-badge c-gold">✓ SÍ</div>
+      </div>
+      <div class="activity-item">
+        <div class="activity-icon">🚀</div>
+        <div class="activity-text">
+          <div class="activity-title">Tu proyecto fue aprobado</div>
+          <div class="activity-time">GreenPack recibió fondos · hace 1d</div>
+        </div>
+        <div class="activity-badge c-cyan">+150 TON</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROYECTOS -->
+  <div class="screen" id="screen-proyectos">
+    <div class="filter-row">
+      <div class="filter-chip active" onclick="filterProjects('all',this)">Todos</div>
+      <div class="filter-chip" onclick="filterProjects('activo',this)">🌱 Activos</div>
+      <div class="filter-chip" onclick="filterProjects('votacion',this)">🗳 En votación</div>
+      <div class="filter-chip" onclick="filterProjects('exitoso',this)">✅ Exitosos</div>
+    </div>
+
+    <div id="projectsList">
+      <div class="proyecto-card" data-status="activo" onclick="openDonate('EcoShop AR','Tienda de productos ecológicos con logística 100% verde en Argentina. Buscan expandirse a 5 provincias.',850,1200)">
+        <div class="proyecto-top">
+          <div><div class="proyecto-name">🌿 EcoShop AR</div><div class="proyecto-cat">Sustentabilidad · Argentina</div></div>
+          <div class="proyecto-status activo">● ACTIVO</div>
+        </div>
+        <div class="proyecto-desc">Tienda de productos ecológicos con logística 100% verde. Expandiéndose a 5 provincias con fondo semilla de la comunidad.</div>
+        <div class="progress-wrap">
+          <div class="progress-info"><span>850 / 1,200 TON</span><span>70.8%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:70.8%"></div></div>
+        </div>
+        <div class="proyecto-meta" style="margin-top:10px">
+          <span>👥 24 donadores</span><span>⏳ 12 días</span><span>💎 ROI est. 18%</span>
+        </div>
+      </div>
+
+      <div class="proyecto-card" data-status="activo" onclick="openDonate('AgroTech AR','Plataforma de agricultura de precisión con IoT para pequeños productores del Litoral.',3200,5000)">
+        <div class="proyecto-top">
+          <div><div class="proyecto-name">🌾 AgroTech AR</div><div class="proyecto-cat">AgriTech · Entre Ríos</div></div>
+          <div class="proyecto-status activo">● ACTIVO</div>
+        </div>
+        <div class="proyecto-desc">Agricultura de precisión con sensores IoT para pequeños productores del Litoral argentino. Respaldado por el INTA.</div>
+        <div class="progress-wrap">
+          <div class="progress-info"><span>3,200 / 5,000 TON</span><span>64%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:64%"></div></div>
+        </div>
+        <div class="proyecto-meta" style="margin-top:10px">
+          <span>👥 67 donadores</span><span>⏳ 21 días</span><span>💎 ROI est. 34%</span>
+        </div>
+      </div>
+
+      <div class="proyecto-card" data-status="votacion" onclick="openDonate('GreenPack','Packaging biodegradable para e-commerce. Primer lote listo, buscando capital de escala.',420,600)">
+        <div class="proyecto-top">
+          <div><div class="proyecto-name">📦 GreenPack</div><div class="proyecto-cat">Manufactura · CABA</div></div>
+          <div class="proyecto-status votacion">⚡ VOTACIÓN</div>
+        </div>
+        <div class="proyecto-desc">Packaging 100% biodegradable para e-commerce. Primer lote fabricado, buscando capital de escala para distribución nacional.</div>
+        <div class="progress-wrap">
+          <div class="progress-info"><span>420 / 600 TON</span><span>70%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:70%"></div></div>
+        </div>
+        <div class="proyecto-meta" style="margin-top:10px">
+          <span>👥 19 donadores</span><span>⏳ 5 días</span><span>💎 ROI est. 22%</span>
+        </div>
+      </div>
+
+      <div class="proyecto-card" data-status="votacion" onclick="openDonate('IA Tutores AR','Plataforma de tutoría con IA para estudiantes secundarios. Piloto en 3 escuelas con resultados positivos.',880,2000)">
+        <div class="proyecto-top">
+          <div><div class="proyecto-name">🤖 IA Tutores AR</div><div class="proyecto-cat">Educación · Rosario</div></div>
+          <div class="proyecto-status votacion">⚡ VOTACIÓN</div>
+        </div>
+        <div class="proyecto-desc">Tutoría con IA para estudiantes de bajos recursos. Piloto exitoso en 3 escuelas de Rosario con mejoras en comprensión lectora.</div>
+        <div class="progress-wrap">
+          <div class="progress-info"><span>880 / 2,000 TON</span><span>44%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:44%"></div></div>
+        </div>
+        <div class="proyecto-meta" style="margin-top:10px">
+          <span>👥 41 donadores</span><span>⏳ 11 días</span><span>💎 ROI est. 29%</span>
+        </div>
+      </div>
+
+      <div class="proyecto-card" data-status="exitoso" onclick="openDonate('SolarKit Córdoba','Kits solares de bajo costo para hogares rurales sin acceso a red eléctrica.',5000,5000)">
+        <div class="proyecto-top">
+          <div><div class="proyecto-name">☀️ SolarKit Córdoba</div><div class="proyecto-cat">Energía · Córdoba</div></div>
+          <div class="proyecto-status activo" style="background:rgba(0,212,255,0.1);color:var(--diamond)">✅ EXITOSO</div>
+        </div>
+        <div class="proyecto-desc">Kits solares de bajo costo para hogares rurales sin acceso a red eléctrica. 200 familias beneficiadas en primera etapa.</div>
+        <div class="progress-wrap">
+          <div class="progress-info"><span>5,000 / 5,000 TON</span><span>100%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+        </div>
+        <div class="proyecto-meta" style="margin-top:10px">
+          <span>👥 143 donadores</span><span>✅ Financiado</span><span>💎 ROI 41%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center;padding:22px;cursor:pointer;margin-top:4px" onclick="openCrearModal()">
+      <div style="font-size:30px;margin-bottom:8px">➕</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:4px">Proponer mi Proyecto</div>
+      <div style="font-size:12px;color:var(--text-muted)">Presenta tu emprendimiento al Consejo</div>
+    </div>
+  </div>
+
+  <!-- VOTAR -->
+  <div class="screen" id="screen-votar">
+    <div class="info-box" style="margin-bottom:16px">
+      <strong>⚖️ Consejo de Votación</strong><br>
+      Tus diamantes te dan poder de voto. Vota para aprobar o rechazar el financiamiento de proyectos con fondos del pool comunitario. Período de votación: <strong style="color:var(--gold)">30 días hábiles</strong>.
+    </div>
+
+    <div class="section-title">EN VOTACIÓN ACTIVA</div>
+
+    <div class="vote-card">
+      <div class="vote-header">
+        <div class="vote-title">📦 GreenPack — 600 TON</div>
+        <div class="vote-timer">⏱ 5 días</div>
+      </div>
+      <div class="vote-desc">Solicitan 600 TON del pool comunitario para escalar producción de packaging biodegradable. Proyecto verificado con prototipo funcional y convenios con 3 marketplaces.</div>
+      <div class="progress-wrap">
+        <div class="progress-info"><span>Votos a favor</span><span>73%</span></div>
+        <div class="progress-bar"><div class="progress-fill green" style="width:73%"></div></div>
+      </div>
+      <div class="vote-result">
+        <span class="vr-yes">✅ 73% a favor (146 votos)</span>
+        <span class="vr-no">❌ 27% contra (54 votos)</span>
+      </div>
+      <div class="vote-btns" style="margin-top:12px">
+        <button class="vote-yes" onclick="castVote('GreenPack','SÍ',this)">✅ Aprobar</button>
+        <button class="vote-no" onclick="castVote('GreenPack','NO',this)">❌ Rechazar</button>
+      </div>
+    </div>
+
+    <div class="vote-card">
+      <div class="vote-header">
+        <div class="vote-title">🤖 IA Tutores AR — 2,000 TON</div>
+        <div class="vote-timer">⏱ 11 días</div>
+      </div>
+      <div class="vote-desc">Plataforma de tutoría con IA para estudiantes secundarios de bajos recursos. Piloto en 3 escuelas de Rosario con resultados positivos en comprensión lectora.</div>
+      <div class="progress-wrap">
+        <div class="progress-info"><span>Votos a favor</span><span>88%</span></div>
+        <div class="progress-bar"><div class="progress-fill green" style="width:88%"></div></div>
+      </div>
+      <div class="vote-result">
+        <span class="vr-yes">✅ 88% a favor (220 votos)</span>
+        <span class="vr-no">❌ 12% contra (30 votos)</span>
+      </div>
+      <div class="vote-btns" style="margin-top:12px">
+        <button class="vote-yes" onclick="castVote('IA Tutores AR','SÍ',this)">✅ Aprobar</button>
+        <button class="vote-no" onclick="castVote('IA Tutores AR','NO',this)">❌ Rechazar</button>
+      </div>
+    </div>
+
+    <div class="section-title">HISTORIAL DE VOTOS</div>
+    <div class="card" style="padding:14px">
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:12px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text-muted)">AgroTech AR</span>
+          <span style="color:var(--green);font-weight:600">✅ APROBADO · 91%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text-muted)">CryptoFood BA</span>
+          <span style="color:#FF6B6B;font-weight:600">❌ RECHAZADO · 61%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text-muted)">SolarKit Córdoba</span>
+          <span style="color:var(--green);font-weight:600">✅ APROBADO · 78%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RANKING -->
+  <div class="screen" id="screen-ranking">
+    <div class="filter-row">
+      <div class="filter-chip active">💎 Diamantes</div>
+      <div class="filter-chip">💰 Donado</div>
+      <div class="filter-chip">🐋 Ballenas</div>
+    </div>
+
+    <div class="card" style="padding:14px" id="rankingList">
+      <div class="rank-item">
+        <div class="rank-num top">🥇</div>
+        <div class="rank-avatar" style="background:rgba(255,215,0,0.15)">🐋</div>
+        <div class="rank-info">
+          <div class="rank-name">cryptowhale_ar</div>
+          <div class="rank-role c-purple">🐋 Ballena · Donador</div>
+        </div>
+        <div class="rank-diamonds">💎 48,200</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num top">🥈</div>
+        <div class="rank-avatar" style="background:rgba(0,212,255,0.1)">🚀</div>
+        <div class="rank-info">
+          <div class="rank-name">emprender_leo</div>
+          <div class="rank-role c-gold">⭐ Emprendedor · Donador</div>
+        </div>
+        <div class="rank-diamonds">💎 31,500</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num top">🥉</div>
+        <div class="rank-avatar" style="background:rgba(0,230,118,0.1)">💙</div>
+        <div class="rank-info">
+          <div class="rank-name">inversor_rosario</div>
+          <div class="rank-role c-cyan">💙 Donador</div>
+        </div>
+        <div class="rank-diamonds">💎 27,840</div>
+      </div>
+      <div class="rank-item" id="myRankItem" style="display:none;border:1px solid rgba(0,212,255,0.25);border-radius:10px;padding:12px;background:rgba(0,212,255,0.03)">
+        <div class="rank-num c-cyan" id="myRankNum">#—</div>
+        <div class="rank-avatar" style="background:rgba(0,136,204,0.15)">😊</div>
+        <div class="rank-info">
+          <div class="rank-name c-cyan" id="myRankName">Tú</div>
+          <div class="rank-role" id="myRankRoles">—</div>
+        </div>
+        <div class="rank-diamonds" id="myRankDiamonds">💎 0</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">4</div>
+        <div class="rank-avatar" style="background:rgba(138,43,226,0.1)">🌊</div>
+        <div class="rank-info">
+          <div class="rank-name">blockchain_ba</div>
+          <div class="rank-role c-purple">🐋 Ballena</div>
+        </div>
+        <div class="rank-diamonds">💎 18,900</div>
+      </div>
+      <div class="rank-item">
+        <div class="rank-num">5</div>
+        <div class="rank-avatar" style="background:rgba(0,212,255,0.08)">💡</div>
+        <div class="rank-info">
+          <div class="rank-name">startup_er</div>
+          <div class="rank-role c-gold">⭐ Emprendedor</div>
+        </div>
+        <div class="rank-diamonds">💎 14,200</div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:16px">BENEFICIOS POR ROL</div>
+    <div class="card" style="padding:14px">
+      <div style="display:flex;flex-direction:column;gap:14px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:20px">💙</div>
+          <div><div style="font-weight:700">Donador</div><div style="color:var(--text-muted)">+0.01 TON donado · Acceso a proyectos · Poder de voto</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:20px">⭐</div>
+          <div><div style="font-weight:700;color:var(--gold)">Emprendedor</div><div style="color:var(--text-muted)">Proponer proyectos · Recibir financiamiento · ROI proporcional</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:20px">🐋</div>
+          <div><div style="font-weight:700;color:#C77DFF">Ballena</div><div style="color:var(--text-muted)">≥500 TON donado · Voto ponderado ×3 · Acceso prioritario</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHITEPAPER -->
+  <div class="screen" id="screen-wp">
+    <div class="token-pill">📄 Whitepaper v1.0 · Junio 2025</div>
+
+    <div class="wp-section">
+      <h3>🎯 Resumen Ejecutivo</h3>
+      <p>GrowFund TON es una plataforma de financiamiento colectivo descentralizada construida sobre la red TON (The Open Network), integrada nativamente en Telegram. Su misión es democratizar el acceso al capital emprendedor en Latinoamérica, conectando emprendedores con donadores e inversores a través de un sistema de gobernanza comunitaria transparente.</p>
+    </div>
+
+    <div class="wp-section">
+      <h3>💎 Sistema de Diamantes (pre-token)</h3>
+      <p>Los Diamantes son la unidad de recompensa interna de la plataforma. No son dinero real ni tienen cotización externa, pero registran la participación activa de cada usuario.</p>
+      <table class="wp-table">
+        <tr><th>Donación TON</th><th>Diamantes recibidos</th><th>Multiplicador</th></tr>
+        <tr><td>0.01 TON</td><td>0.05 💎</td><td>×5</td></tr>
+        <tr><td>0.1 TON</td><td>0.5 💎</td><td>×5</td></tr>
+        <tr><td>1 TON</td><td>5 💎</td><td>×5</td></tr>
+        <tr><td>10 TON</td><td>50 💎</td><td>×5</td></tr>
+        <tr><td>≥500 TON</td><td>2,500 💎 + Ballena</td><td>×5 + badge</td></tr>
+      </table>
+    </div>
+
+    <div class="wp-section">
+      <h3>🪙 Token GFT (GrowFund Token)</h3>
+      <p>En la Fase 2 de la plataforma, los Diamantes se convierten en tokens GFT en la red TON a razón de <strong style="color:var(--diamond)">1 💎 = 0.2 GFT</strong>. Los tokens GFT permiten:</p>
+      <p>· Participar en el reparto de ganancias de proyectos exitosos<br>· Votar en el Consejo con peso proporcional<br>· Acceder a proyectos exclusivos para holders<br>· Recibir royalties del pool operativo</p>
+    </div>
+
+    <div class="wp-section">
+      <h3>⚖️ Distribución de Fondos</h3>
+      <div style="margin:16px 0">
+        <div class="dist-row">
+          <div class="dist-label">Emprendedor</div>
+          <div class="dist-fill-wrap"><div class="dist-fill" style="width:90%;background:linear-gradient(90deg,var(--green),#4ADE80)"></div></div>
+          <div class="dist-pct c-green">90%</div>
+        </div>
+        <div class="dist-row">
+          <div class="dist-label">Pool GrowFund</div>
+          <div class="dist-fill-wrap"><div class="dist-fill" style="width:10%;background:linear-gradient(90deg,var(--ton-blue),var(--diamond))"></div></div>
+          <div class="dist-pct c-cyan">10%</div>
+        </div>
+      </div>
+      <p>El 10% retenido por GrowFund se distribuye: 4% operaciones, 3% fondo liquidez GFT, 2% recompensas comunidad, 1% reserva legal.</p>
+    </div>
+
+    <div class="wp-section">
+      <h3>🐋 Roles de Usuario</h3>
+      <p><strong style="color:var(--diamond)">Donador:</strong> Cualquier usuario que realiza al menos 1 donación. Recibe diamantes y accede a proyectos activos.</p>
+      <p><strong style="color:var(--gold)">Emprendedor:</strong> Usuario que presenta proyectos para financiamiento. Si el proyecto es exitoso, recibe retorno proporcional a la valuación.</p>
+      <p><strong style="color:#C77DFF">Ballena:</strong> Usuario que donó ≥500 TON total. Su voto en el Consejo cuenta ×3 y recibe acceso prioritario.</p>
+      <p style="margin-top:8px"><em style="color:var(--text-muted)">Un mismo usuario puede pertenecer a los 3 grupos simultáneamente.</em></p>
+    </div>
+
+    <div class="wp-section">
+      <h3>📊 Valuación de Proyectos</h3>
+      <p>La valuación se calcula en tiempo real según la interacción comunitaria:</p>
+      <table class="wp-table">
+        <tr><th>Acción</th><th>Puntos de valuación</th></tr>
+        <tr><td>👍 Like</td><td>+1 punto</td></tr>
+        <tr><td>💬 Comentario</td><td>+3 puntos</td></tr>
+        <tr><td>🔗 Share</td><td>+5 puntos</td></tr>
+        <tr><td>💰 Donación</td><td>+10 puntos</td></tr>
+      </table>
+    </div>
+
+    <div class="wp-section">
+      <h3>🗺 Roadmap</h3>
+      <table class="wp-table">
+        <tr><th>Fase</th><th>Descripción</th><th>Estado</th></tr>
+        <tr><td>Q2 2025</td><td>Lanzamiento miniapp + sistema diamantes</td><td style="color:var(--green)">✅ Live</td></tr>
+        <tr><td>Q3 2025</td><td>Consejo de votación + 50 proyectos</td><td style="color:var(--gold)">🔄 En curso</td></tr>
+        <tr><td>Q4 2025</td><td>Lanzamiento token GFT en TON</td><td style="color:var(--text-muted)">⏳ Próx.</td></tr>
+        <tr><td>Q1 2026</td><td>Expansión LATAM + fiat on-ramp</td><td style="color:var(--text-muted)">⏳ Planif.</td></tr>
+      </table>
+    </div>
+
+    <div class="wp-section">
+      <h3>🔐 Seguridad y Transparencia</h3>
+      <p>GrowFund TON nunca solicita transferencia de activos durante la conexión de billetera. Toda la lógica de distribución de fondos opera mediante smart contracts auditables en la red TON. El historial de votaciones del Consejo es público e inmutable.</p>
+      <div class="info-box">
+        <strong>🔒 Dirección del contrato:</strong><br>
+        <span style="font-family:monospace;font-size:11px;color:var(--diamond);word-break:break-all">UQD-Hh6Bb_hn3k0zrizn_e32-5dWPThZnCDT0qhOtwMxTkHc</span>
+      </div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <div class="nav-item active" onclick="navTo('home',this)">
+    <div class="nav-icon">🏠</div>
+    <div class="nav-label">INICIO</div>
+  </div>
+  <div class="nav-item" onclick="navTo('proyectos',this)">
+    <div class="nav-icon">🚀</div>
+    <div class="nav-label">PROYECTOS</div>
+  </div>
+  <div class="nav-item" onclick="navTo('votar',this)">
+    <div class="nav-icon">🗳</div>
+    <div class="nav-label">VOTAR</div>
+  </div>
+  <div class="nav-item" onclick="navTo('ranking',this)">
+    <div class="nav-icon">🏆</div>
+    <div class="nav-label">RANKING</div>
+  </div>
+  <div class="nav-item" onclick="navTo('wp',this)">
+    <div class="nav-icon">📄</div>
+    <div class="nav-label">WP</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  CANVAS PARTICLES
+// ═══════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+class Particle {
+  constructor() { this.reset(); }
+  reset() {
+    this.x = Math.random() * canvas.width;
+    this.y = canvas.height + 20;
+    this.size = Math.random() * 4 + 2;
+    this.speedY = Math.random() * 0.4 + 0.1;
+    this.speedX = (Math.random() - 0.5) * 0.3;
+    this.opacity = Math.random() * 0.5 + 0.1;
+    this.hue = Math.random() > 0.5 ? 195 : 210;
+  }
+  update() {
+    this.y -= this.speedY;
+    this.x += this.speedX;
+    if (this.y < -20) this.reset();
+  }
+  draw() {
+    ctx.save();
+    ctx.globalAlpha = this.opacity;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = `hsl(${this.hue}, 100%, 70%)`;
+    ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+    ctx.restore();
+  }
+}
+
+for (let i = 0; i < 40; i++) {
+  const p = new Particle();
+  p.y = Math.random() * canvas.height;
+  particles.push(p);
+}
+function animateParticles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particles.forEach(p => { p.update(); p.draw(); });
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+
+// ═══════════════════════════════════════
+//  TELEGRAM WEBAPP
+// ═══════════════════════════════════════
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor('#0A0E1A');
+  tg.setBackgroundColor('#0A0E1A');
+}
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+const STATE = {
+  walletConnected: false,
+  walletAddress: null,
+  diamonds: 0,
+  totalDonated: 0,
+  projectCount: 0,
+  voteCount: 0,
+  roles: [],
+  isDemoMode: false,
+  transactions: []
+};
+
+const GROWFUND_ADDRESS = 'UQD-Hh6Bb_hn3k0zrizn_e32-5dWPThZnCDT0qhOtwMxTkHc';
+const DIAMOND_RATE = 5; // 1 TON = 5 diamonds
+const WHALE_THRESHOLD = 500; // TON
+
+// ═══════════════════════════════════════
+//  TON CONNECT
+// ═══════════════════════════════════════
+let tonConnectUI = null;
+
+async function initTonConnect() {
+  try {
+    tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+      manifestUrl: 'https://raw.githubusercontent.com/ton-community/tutorials/main/03-client/test/public/tonconnect-manifest.json',
+      buttonRootId: 'ton-connect-overlay-btn'
+    });
+
+    // Listen for wallet connection changes
+    tonConnectUI.onStatusChange(wallet => {
+      if (wallet) {
+        const addr = wallet.account.address;
+        onWalletConnected(addr);
+      } else {
+        onWalletDisconnected();
+      }
+    });
+
+    // Check if already connected
+    const wallet = tonConnectUI.wallet;
+    if (wallet) {
+      onWalletConnected(wallet.account.address);
+    }
+  } catch (err) {
+    console.warn('TON Connect init error:', err);
+    // Fallback: show manual connect
+  }
+}
+
+function formatAddress(addr) {
+  if (!addr) return '';
+  const s = addr.toString();
+  return s.substring(0, 6) + '...' + s.substring(s.length - 4);
+}
+
+function onWalletConnected(address) {
+  STATE.walletConnected = true;
+  STATE.walletAddress = address;
+  STATE.isDemoMode = false;
+
+  document.getElementById('connectOverlay').classList.add('hidden');
+
+  const btn = document.getElementById('walletStatusBtn');
+  btn.classList.add('connected');
+  btn.innerHTML = '<div class="wallet-dot"></div>' + formatAddress(address);
+
+  // Load user data from localStorage
+  loadUserData();
+  updateRoles();
+  updateMyRankItem();
+
+  showToast('✅ Billetera conectada', 'green');
+}
+
+function onWalletDisconnected() {
+  STATE.walletConnected = false;
+  STATE.walletAddress = null;
+
+  const btn = document.getElementById('walletStatusBtn');
+  btn.classList.remove('connected');
+  btn.innerHTML = '🔗 Conectar';
+
+  document.getElementById('rolesRow').innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:5px 0">Conecta tu billetera para ver tus roles</div>';
+  document.getElementById('myRankItem').style.display = 'none';
+}
+
+function handleWalletBtn() {
+  if (STATE.isDemoMode) { return; }
+  if (STATE.walletConnected) {
+    // Show disconnect option
+    if (confirm('¿Desconectar billetera?')) {
+      tonConnectUI?.disconnect();
+    }
+    return;
+  }
+  document.getElementById('connectOverlay').classList.remove('hidden');
+}
+
+function demoMode() {
+  STATE.walletConnected = true;
+  STATE.isDemoMode = true;
+  STATE.walletAddress = 'DEMO';
+  STATE.diamonds = 2450;
+  STATE.totalDonated = 490;
+  STATE.projectCount = 3;
+  STATE.voteCount = 12;
+
+  document.getElementById('connectOverlay').classList.add('hidden');
+  const btn = document.getElementById('walletStatusBtn');
+  btn.innerHTML = '👁 DEMO';
+  btn.classList.add('connected');
+  btn.style.color = 'var(--gold)';
+
+  updateUI();
+  showToast('👁 Modo demo activo', 'cyan');
+}
+
+// ═══════════════════════════════════════
+//  USER DATA
+// ═══════════════════════════════════════
+function saveUserData() {
+  if (!STATE.walletAddress || STATE.isDemoMode) return;
+  const key = 'growfund_' + STATE.walletAddress.slice(-8);
+  localStorage.setItem(key, JSON.stringify({
+    diamonds: STATE.diamonds,
+    totalDonated: STATE.totalDonated,
+    projectCount: STATE.projectCount,
+    voteCount: STATE.voteCount,
+    transactions: STATE.transactions.slice(-20)
+  }));
+}
+
+function loadUserData() {
+  if (!STATE.walletAddress) return;
+  const key = 'growfund_' + STATE.walletAddress.slice(-8);
+  const saved = localStorage.getItem(key);
+  if (saved) {
+    const d = JSON.parse(saved);
+    STATE.diamonds = d.diamonds || 0;
+    STATE.totalDonated = d.totalDonated || 0;
+    STATE.projectCount = d.projectCount || 0;
+    STATE.voteCount = d.voteCount || 0;
+    STATE.transactions = d.transactions || [];
+  }
+  updateUI();
+}
+
+function updateUI() {
+  document.getElementById('userDiamonds').textContent = STATE.diamonds.toLocaleString();
+  document.getElementById('gftEstimate').textContent = '≈ ' + Math.floor(STATE.diamonds * 0.2).toLocaleString() + ' GFT';
+  document.getElementById('totalDonated').textContent = STATE.totalDonated.toFixed(2) + ' TON';
+  document.getElementById('projectCount').textContent = STATE.projectCount;
+  document.getElementById('voteCount').textContent = STATE.voteCount;
+}
+
+function updateRoles() {
+  const roles = [];
+  if (STATE.totalDonated >= 0.01) roles.push('donador');
+  if (STATE.projectCount > 0) roles.push('emprendedor');
+  if (STATE.totalDonated >= WHALE_THRESHOLD) roles.push('ballena');
+  STATE.roles = roles;
+
+  const row = document.getElementById('rolesRow');
+  if (roles.length === 0) {
+    row.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:5px 0">Realiza una donación para obtener tu primer rol</div>';
+  } else {
+    const labels = { donador: '💙 Donador', emprendedor: '⭐ Emprendedor', ballena: '🐋 Ballena' };
+    row.innerHTML = roles.map(r => `<div class="role-badge ${r}">${labels[r]}</div>`).join('');
+  }
+}
+
+function updateMyRankItem() {
+  if (!STATE.walletConnected) return;
+  const item = document.getElementById('myRankItem');
+  item.style.display = 'flex';
+  document.getElementById('myRankDiamonds').textContent = '💎 ' + STATE.diamonds.toLocaleString();
+  const roleLabels = STATE.roles.map(r => ({ donador: '💙 Donador', emprendedor: '⭐ Emprendedor', ballena: '🐋 Ballena' })[r]).join(' · ');
+  document.getElementById('myRankRoles').textContent = roleLabels || '— Sin rol aún';
+}
+
+// ═══════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════
+function navTo(id, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+// ═══════════════════════════════════════
+//  PROJECTS FILTER
+// ═══════════════════════════════════════
+function filterProjects(status, el) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+
+  document.querySelectorAll('.proyecto-card').forEach(card => {
+    if (status === 'all') {
+      card.style.display = 'block';
+    } else {
+      card.style.display = card.dataset.status === status ? 'block' : 'none';
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+//  DONATE MODAL
+// ═══════════════════════════════════════
+let currentDonateProject = null;
+
+function openDonate(name, desc, raised, goal) {
+  currentDonateProject = { name, desc, raised, goal };
+  document.getElementById('modalProjectName').textContent = '💸 Donar a ' + name;
+  document.getElementById('modalProjectDesc').textContent = desc;
+  document.getElementById('donateAmount').value = '';
+  document.getElementById('diamondPreview').textContent = '💎 0.00';
+  document.getElementById('txStatus').classList.remove('visible');
+  document.getElementById('txHash').textContent = '';
+  document.getElementById('confirmDonateBtn').disabled = false;
+  document.getElementById('confirmDonateBtn').innerHTML = '💎 Confirmar Donación en TON';
+  document.querySelectorAll('.amount-chip').forEach(c => c.classList.remove('sel'));
+  document.getElementById('donateModal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('donateModal').classList.remove('open');
+  currentDonateProject = null;
+}
+
+function setAmount(val) {
+  document.getElementById('donateAmount').value = val;
+  calcDiamonds();
+  document.querySelectorAll('.amount-chip').forEach(c => {
+    c.classList.toggle('sel', parseFloat(c.textContent) === val);
+  });
+}
+
+function calcDiamonds() {
+  const ton = parseFloat(document.getElementById('donateAmount').value) || 0;
+  document.getElementById('diamondPreview').textContent = '💎 ' + (ton * DIAMOND_RATE).toFixed(2);
+}
+
+async function confirmDonate() {
+  if (!STATE.walletConnected) {
+    showToast('❗ Conecta tu billetera primero', 'red');
+    closeModal();
+    document.getElementById('connectOverlay').classList.remove('hidden');
+    return;
+  }
+
+  const ton = parseFloat(document.getElementById('donateAmount').value);
+  if (!ton || ton <= 0) {
+    showToast('❗ Ingresa un monto válido', 'red');
+    return;
+  }
+  if (ton < 0.01) {
+    showToast('❗ Mínimo 0.01 TON', 'red');
+    return;
+  }
+
+  const btn = document.getElementById('confirmDonateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Procesando...';
+
+  const txStatus = document.getElementById('txStatus');
+  const txHashEl = document.getElementById('txHash');
+  txStatus.classList.add('visible');
+  document.getElementById('txStatusText').textContent = '⏳ Esperando confirmación en billetera...';
+
+  // Demo mode: simulate transaction
+  if (STATE.isDemoMode) {
+    await simulateTransaction(ton);
+    return;
+  }
+
+  // Real TON Connect transaction
+  try {
+    const nanotons = Math.floor(ton * 1e9).toString();
+    const transaction = {
+      validUntil: Math.floor(Date.now() / 1000) + 300,
+      messages: [
+        {
+          address: GROWFUND_ADDRESS,
+          amount: nanotons,
+          payload: btoa('GrowFund:' + (currentDonateProject?.name || 'donation')),
+        }
+      ]
+    };
+
+    document.getElementById('txStatusText').textContent = '📱 Aprobando en tu billetera TON...';
+
+    const result = await tonConnectUI.sendTransaction(transaction);
+
+    if (result?.boc) {
+      document.getElementById('txStatusText').textContent = '✅ Transacción enviada — confirmando en blockchain...';
+      txHashEl.textContent = 'BOC: ' + result.boc.slice(0, 40) + '...';
+
+      // Wait a moment for UX
+      await delay(2000);
+      onDonationSuccess(ton);
+    } else {
+      throw new Error('No BOC returned');
+    }
+  } catch (err) {
+    console.error('Transaction error:', err);
+    if (err.message?.includes('Reject') || err.message?.includes('User rejected')) {
+      showToast('❌ Transacción cancelada', 'red');
+    } else {
+      showToast('⚠️ Error de transacción. Intenta de nuevo.', 'red');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '💎 Confirmar Donación en TON';
+    txStatus.classList.remove('visible');
+  }
+}
+
+async function simulateTransaction(ton) {
+  await delay(1200);
+  document.getElementById('txStatusText').textContent = '📦 Confirmando en TON testnet...';
+  await delay(1500);
+  document.getElementById('txHash').textContent = 'TX: 0x' + Math.random().toString(16).slice(2, 34).toUpperCase() + '...';
+  await delay(800);
+  onDonationSuccess(ton);
+}
+
+function onDonationSuccess(ton) {
+  const diamonds = ton * DIAMOND_RATE;
+  STATE.diamonds += diamonds;
+  STATE.totalDonated += ton;
+
+  if (!STATE.roles.includes('donador')) {
+    showToast('🎉 ¡Bienvenido! Ahora eres Donador 💙', 'cyan');
+  }
+
+  updateRoles();
+
+  if (ton >= WHALE_THRESHOLD && !STATE.roles.includes('ballena')) {
+    setTimeout(() => showToast('🐋 ¡Alcanzaste el rango Ballena! Voto ×3', 'cyan'), 2000);
+  }
+
+  STATE.transactions.unshift({
+    type: 'donation',
+    project: currentDonateProject?.name,
+    ton: ton,
+    diamonds: diamonds,
+    timestamp: Date.now()
+  });
+
+  updateUI();
+  updateMyRankItem();
+  saveUserData();
+
+  document.getElementById('txStatusText').textContent = '✅ ¡Transacción confirmada en TON!';
+  document.getElementById('confirmDonateBtn').innerHTML = '✅ Donación Exitosa';
+
+  setTimeout(() => {
+    closeModal();
+    showToast('💎 +' + diamonds.toFixed(2) + ' diamantes ganados', 'green');
+  }, 1500);
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ═══════════════════════════════════════
+//  VOTING
+// ═══════════════════════════════════════
+function castVote(project, vote, btn) {
+  if (!STATE.walletConnected) {
+    showToast('❗ Conecta tu billetera para votar', 'red');
+    return;
+  }
+  if (!STATE.roles.includes('donador') && !STATE.isDemoMode) {
+    showToast('❗ Debes ser Donador para votar', 'red');
+    return;
+  }
+
+  const card = btn.closest('.vote-card');
+  card.querySelectorAll('.vote-yes, .vote-no').forEach(b => {
+    b.disabled = true;
+    b.style.opacity = '0.5';
+  });
+  btn.style.opacity = '1';
+  btn.style.boxShadow = vote === 'SÍ' ? '0 0 12px rgba(0,230,118,0.4)' : '0 0 12px rgba(255,68,68,0.4)';
+
+  STATE.voteCount++;
+  updateUI();
+  saveUserData();
+
+  showToast((vote === 'SÍ' ? '✅' : '❌') + ' Voto registrado en ' + project, vote === 'SÍ' ? 'green' : 'red');
+}
+
+// ═══════════════════════════════════════
+//  CREAR PROYECTO MODAL
+// ═══════════════════════════════════════
+function openCrearModal() {
+  if (!STATE.walletConnected) {
+    showToast('❗ Conecta tu billetera primero', 'red');
+    document.getElementById('connectOverlay').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('newProjectName').value = '';
+  document.getElementById('newProjectDesc').value = '';
+  document.getElementById('newProjectGoal').value = '';
+  document.getElementById('crearModal').classList.add('open');
+}
+
+function closeCrearModal() {
+  document.getElementById('crearModal').classList.remove('open');
+}
+
+function submitProject() {
+  const name = document.getElementById('newProjectName').value.trim();
+  const desc = document.getElementById('newProjectDesc').value.trim();
+  const goal = parseFloat(document.getElementById('newProjectGoal').value);
+
+  if (!name || name.length < 3) { showToast('❗ Ingresa un nombre válido', 'red'); return; }
+  if (!desc || desc.length < 20) { showToast('❗ La descripción debe tener al menos 20 caracteres', 'red'); return; }
+  if (!goal || goal < 10) { showToast('❗ La meta mínima es 10 TON', 'red'); return; }
+
+  STATE.projectCount++;
+  if (!STATE.roles.includes('emprendedor')) STATE.roles.push('emprendedor');
+  updateUI();
+  updateRoles();
+  updateMyRankItem();
+  saveUserData();
+
+  closeCrearModal();
+  showToast('🚀 Proyecto enviado al Consejo de Votación', 'cyan');
+
+  // Add project card to list
+  const card = document.createElement('div');
+  card.className = 'proyecto-card';
+  card.dataset.status = 'votacion';
+  card.innerHTML = `
+    <div class="proyecto-top">
+      <div><div class="proyecto-name">🚀 ${name}</div><div class="proyecto-cat">${document.getElementById('newProjectCat').selectedOptions[0].text} · Tu proyecto</div></div>
+      <div class="proyecto-status votacion">⚡ VOTACIÓN</div>
+    </div>
+    <div class="proyecto-desc">${desc}</div>
+    <div class="progress-wrap">
+      <div class="progress-info"><span>0 / ${goal} TON</span><span>0%</span></div>
+      <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+    </div>
+    <div class="proyecto-meta" style="margin-top:10px">
+      <span>👥 0 donadores</span><span>⏳ 30 días</span><span>💎 ROI est. —</span>
+    </div>
+  `;
+  document.getElementById('projectsList').insertBefore(card, document.getElementById('projectsList').lastElementChild);
+}
+
+// ═══════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════
+let toastTimer;
+function showToast(msg, type) {
+  clearTimeout(toastTimer);
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ═══════════════════════════════════════
+//  MODAL BACKDROP CLOSE
+// ═══════════════════════════════════════
+document.getElementById('donateModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('donateModal')) closeModal();
+});
+document.getElementById('crearModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('crearModal')) closeCrearModal();
+});
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+window.addEventListener('load', () => {
+  initTonConnect();
+  // Animate hero card
+  if (typeof gsap !== 'undefined') {
+    gsap.from('.hero-card', { y: 20, opacity: 0, duration: 0.6, ease: 'power2.out' });
+    gsap.from('.diamond-row', { y: 20, opacity: 0, duration: 0.6, delay: 0.15, ease: 'power2.out' });
+  }
+});
+</script>
+</body>
+</html>
